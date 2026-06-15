@@ -1,19 +1,19 @@
 /**
- * ͼƬ�ϴ� API
+ * 图片上传 API
  * 
- * ���ܣ�����ǰ���ϴ���ͼƬ�ļ������浽 public/uploads/ Ŀ¼��
- * ���ؿɷ��ʵ� URL ·����
+ * 功能：接收前端上传的图片文件，保存到 public/uploads/ 目录，
+ * 返回可访问的 URL 路径。
  * 
- * ��ȫ��ʩ��
- * - ֻ����ͼƬ���ͣ�JPEG��PNG��GIF��WebP��
- * - �����ļ���СΪ 5MB
- * - ʹ�� UUID �������ļ�����ֹ�ļ�����ͻ��·������
+ * 安全措施：
+ * - 只允许图片类型（JPEG、PNG、GIF、WebP）
+ * - 限制文件大小为 5MB
+ * - 使用 UUID 重命名文件，防止文件名冲突和路径遍历
  * 
- * ʹ�÷�ʽ��
+ * 使用方式：
  *   POST /api/upload
  *   Content-Type: multipart/form-data
- *   Body: file (ͼƬ�ļ�)
- *   ��Ӧ: { url: "/uploads/uuid-filename.png" }
+ *   Body: file (图片文件)
+ *   响应: { url: "/uploads/uuid-filename.png" }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,7 +22,7 @@ import { randomUUID } from "crypto";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 
-// �����ͼƬ MIME ����
+// 允许的图片 MIME 类型
 const ALLOWED_TYPES = [
   "image/jpeg",
   "image/png",
@@ -30,65 +30,60 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
-// ����ļ���С��5MB
+// 最大文件大小：5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 /**
  * POST /api/upload
- * ����ͼƬ�ϴ�����
+ * 处理图片上传请求
  */
 export async function POST(request: NextRequest) {
-  // ===== 1. ��֤��� =====
+  // ===== 1. 认证检查 =====
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "���ȵ�¼" }, { status: 401 });
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
 
   try {
-    // ===== 2. ���� multipart/form-data =====
+    // ===== 2. 解析 multipart/form-data =====
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
-    // ����Ƿ����ļ�
     if (!file || file.size === 0) {
-      return NextResponse.json({ error: "û��ѡ���ļ�" }, { status: 400 });
+      return NextResponse.json({ error: "没有选择文件" }, { status: 400 });
     }
 
-    // ===== 3. ����У�� =====
+    // ===== 3. 类型校验 =====
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { error: "ֻ֧�� JPEG��PNG��GIF��WebP ��ʽ" },
+        { error: "只支持 JPEG、PNG、GIF、WebP 格式" },
         { status: 400 }
       );
     }
 
-    // ===== 4. ��СУ�� =====
+    // ===== 4. 大小校验 =====
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "�ļ���С���ܳ��� 5MB" },
+        { error: "文件大小不能超过 5MB" },
         { status: 400 }
       );
     }
 
-    // ===== 5. ����Ψһ�ļ��� =====
-    // ��ȡԭʼ�ļ���չ��
+    // ===== 5. 生成唯一文件名 =====
     const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    // �� UUID ��ֹ�ļ�����ͻ��·����������
     const filename = `${randomUUID()}.${ext}`;
 
-    // ===== 6. д����� =====
-    // public/uploads/ Ŀ¼�µ��ļ�����ֱ��ͨ�� /uploads/xxx ����
+    // ===== 6. 写入磁盘 =====
     const buffer = Buffer.from(await file.arrayBuffer());
     const uploadDir = join(process.cwd(), "public", "uploads");
     const filePath = join(uploadDir, filename);
     await writeFile(filePath, buffer);
 
-    // ===== 7. ���ط��� URL =====
+    // ===== 7. 返回访问 URL =====
     const url = `/uploads/${filename}`;
     return NextResponse.json({ url });
   } catch (error) {
-    // ��������δԤ�ڵĴ���
-    console.error("�ϴ�ʧ��:", error);
-    return NextResponse.json({ error: "�ϴ�ʧ�ܣ����Ժ�����" }, { status: 500 });
+    console.error("上传失败:", error);
+    return NextResponse.json({ error: "上传失败，请稍后重试" }, { status: 500 });
   }
 }
