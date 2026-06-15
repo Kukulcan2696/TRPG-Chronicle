@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("PLAYER")
+  password      String?
+
+  accounts         Account[]
+  campaigns        Campaign[]       @relation("DMCampaigns")
+  campaignMembers  CampaignMember[]
+  posts            Post[]
+  characters       Character[]
+  worldEntries     WorldEntry[]
+  randomTables     RandomTable[]
+  diceRolls        DiceRoll[]
+  scheduleRSVPs    ScheduleRSVP[]
+  scheduleEvents   ScheduleEvent[]
+  media            Media[]
+  sessions         Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  coverImage  String?
+  dmId        String
+
+  dm              User              @relation("DMCampaigns", fields: [dmId], references: [id])
+  members         CampaignMember[]
+  posts           Post[]
+  characters      Character[]
+  worldEntries    WorldEntry[]
+  timelineEvents  TimelineEvent[]
+  randomTables    RandomTable[]
+  scheduleEvents  ScheduleEvent[]
+  media           Media[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CampaignMember {
+  id         String @id @default(cuid())
+  campaignId String
+  userId     String
+  role       String @default("PLAYER")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+}
+
+model Post {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String
+  content       String
+  excerpt       String?
+  campaignId    String
+  sessionNumber Int?
+  gameDate      DateTime?
+  authorId      String
+  published     Boolean   @default(false)
+
+  campaign       Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  author         User            @relation(fields: [authorId], references: [id])
+  timelineEvents TimelineEvent[]
+  diceRolls      DiceRoll[]
+  media          Media[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, slug])
+}
+
+model Character {
+  id         String  @id @default(cuid())
+  name       String
+  campaignId String
+  playerId   String
+  system     String  @default("CUSTOM")
+  sheetData  String  @default("{}")
+  portrait   String?
+  bio        String?
+  isPublic   Boolean @default(true)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  player   User     @relation(fields: [playerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorldEntry {
+  id         String @id @default(cuid())
+  title      String
+  slug       String
+  content    String
+  type       String @default("LORE")
+  campaignId String
+  parentId   String?
+  imageUrl   String?
+  authorId   String
+
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  parent          WorldEntry?      @relation("WorldEntryHierarchy", fields: [parentId], references: [id])
+  children        WorldEntry[]     @relation("WorldEntryHierarchy")
+  author          User             @relation(fields: [authorId], references: [id])
+  timelineEvents  TimelineEvent[]
+  media           Media[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, slug])
+}
+
+model TimelineEvent {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  gameDate     String
+  campaignId   String
+  sessionId    String?
+  worldEntryId String?
+  order        Int      @default(0)
+
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  post       Post?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  worldEntry WorldEntry? @relation(fields: [worldEntryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model RandomTable {
+  id          String @id @default(cuid())
+  title       String
+  description String?
+  campaignId  String
+  tableData   String @default("[]")
+  authorId    String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  author   User     @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduleEvent {
+  id          String   @id @default(cuid())
+  title       String
+  campaignId  String
+  scheduledAt DateTime
+  location    String?
+  notes       String?
+  createdById String
+
+  campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator  User           @relation(fields: [createdById], references: [id])
+  rsvps    ScheduleRSVP[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduleRSVP {
+  id              String @id @default(cuid())
+  scheduleEventId String
+  userId          String
+  status          String @default("PENDING")
+
+  event ScheduleEvent @relation(fields: [scheduleEventId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleEventId, userId])
+}
+
+model DiceRoll {
+  id        String   @id @default(cuid())
+  formula   String
+  result    Int
+  details   String?
+  userId    String
+  postId    String?
+
+  user User  @relation(fields: [userId], references: [id])
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model Media {
+  id           String @id @default(cuid())
+  url          String
+  alt          String?
+  type         String @default("IMAGE")
+  campaignId   String
+  postId       String?
+  worldEntryId String?
+  uploadedById String
+
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  post       Post?       @relation(fields: [postId], references: [id], onDelete: SetNull)
+  worldEntry WorldEntry? @relation(fields: [worldEntryId], references: [id], onDelete: SetNull)
+  uploadedBy User        @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+}

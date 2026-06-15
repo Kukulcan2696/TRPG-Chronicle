@@ -1,65 +1,89 @@
-import Image from "next/image";
+import Link from "next/link";
+import { auth } from "@/auth";
+import { buttonVariants } from "@/components/ui/button";
+import { Dice1, ScrollText, Users, Map } from "lucide-react";
+import { redirect } from "next/navigation";
+import { cn } from "@/lib/utils";
 
-export default function Home() {
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user) {
+    redirect("/dashboard");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2">
+            <Dice1 className="h-6 w-6 text-primary" />
+            <span className="font-bold text-xl">TRPG Chronicle</span>
+          </Link>
+          <Link href="/login" className={cn(buttonVariants())}>
+            登录
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <section className="container mx-auto px-4 py-20 text-center">
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight mb-6">
+            记录每一次
+            <span className="text-primary">冒险</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            跑团编年史是一个专为 TRPG 玩家打造的博客平台。
+            记录战报、管理角色、构建世界观——一切尽在一处。
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <div className="flex gap-4 justify-center">
+            <Link href="/register" className={buttonVariants({ size: "lg" })}>
+              立即开始
+            </Link>
+            <Link
+              href="/login"
+              className={buttonVariants({ size: "lg", variant: "outline" })}
+            >
+              登录
+            </Link>
+          </div>
+        </section>
+
+        <section className="container mx-auto px-4 py-16 border-t">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center p-6">
+              <div className="rounded-full bg-primary/10 p-3 w-fit mx-auto mb-4">
+                <ScrollText className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">战报记录</h3>
+              <p className="text-muted-foreground">
+                Markdown 撰写跑团日志，支持角色链接、骰子嵌入等自定义语法
+              </p>
+            </div>
+            <div className="text-center p-6">
+              <div className="rounded-full bg-primary/10 p-3 w-fit mx-auto mb-4">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">角色管理</h3>
+              <p className="text-muted-foreground">
+                通用角色卡系统，支持 D&D 5e、CoC 7th 及自定义规则
+              </p>
+            </div>
+            <div className="text-center p-6">
+              <div className="rounded-full bg-primary/10 p-3 w-fit mx-auto mb-4">
+                <Map className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">世界观 Wiki</h3>
+              <p className="text-muted-foreground">
+                结构化组织地点、NPC、势力，条目间自动双向链接
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
+
+      <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+        <div className="container mx-auto px-4">TRPG Chronicle — 为跑团而生</div>
+      </footer>
     </div>
   );
 }
