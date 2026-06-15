@@ -5,10 +5,11 @@
  * - Logo + 应用名
  * - 导航链接（仪表盘、战役）
  * - 暗色模式切换
- * - 用户头像下拉菜单（个人设置、退出）
+ * - 用户头像下拉菜单（管理后台、个人设置、退出）
+ * - 管理后台入口仅 ADMIN 角色可见
  * 
  * 关键 Hooks：
- * - useSession(): 获取当前登录用户信息
+ * - useSession(): 获取当前登录用户信息（含 role）
  * - usePathname(): 获取当前路径，用于高亮当前导航项
  * - useRouter(): 编程式导航（用于下拉菜单点击跳转）
  */
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
-import { Dice1, LogOut, User } from "lucide-react";
+import { Dice1, LogOut, User, Shield } from "lucide-react";
 
 // 导航项配置：添加新页面只需在这里加一项
 const navItems = [
@@ -38,6 +39,9 @@ export function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
+
+  // 判断当前用户是否为管理员
+  const isAdmin = (session?.user as any)?.role === "ADMIN";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -82,7 +86,7 @@ export function Navbar() {
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {/* GroupLabel 必须包裹在 Group 内（Base UI 要求） */}
+                {/* 用户名 + 邮箱 */}
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>
                     <p className="text-sm font-medium">{session.user.name}</p>
@@ -90,10 +94,24 @@ export function Navbar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+
+                {/* ===== 管理后台入口（仅 ADMIN 可见） ===== */}
+                {isAdmin && (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push("/admin")}>
+                      <Shield className="mr-2 h-4 w-4" />管理后台
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
+                {/* 个人设置 */}
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   <User className="mr-2 h-4 w-4" />个人设置
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+
+                {/* 退出登录 */}
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="cursor-pointer text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />退出登录
                 </DropdownMenuItem>

@@ -86,6 +86,7 @@ model Campaign {
   timelineEvents  TimelineEvent[]
   randomTables    RandomTable[]
   scheduleEvents  ScheduleEvent[]
+  diceRolls      DiceRoll[]
   media           Media[]
 
   createdAt DateTime @default(now())
@@ -232,15 +233,18 @@ model ScheduleRSVP {
 }
 
 model DiceRoll {
-  id        String   @id @default(cuid())
-  formula   String
-  result    Int
-  details   String?
-  userId    String
-  postId    String?
+  id         String   @id @default(cuid())
+  formula    String
+  result     Int
+  details    String?
+  scene      String?
+  userId     String
+  campaignId String
+  postId     String?
 
-  user User  @relation(fields: [userId], references: [id])
-  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+  user     User     @relation(fields: [userId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  post     Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 }

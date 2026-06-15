@@ -1,12 +1,7 @@
 /**
  * 骰子 Server Actions
  * 
- * 功能：
- * - saveDiceRoll: 保存一次掷骰结果到数据库
- * - getDiceHistory: 获取用户的掷骰历史
- * 
- * DiceRoll 表通过 userId 关联用户，通过 postId 可选关联战报。
- * 目前直接从战役骰子页面保存，不关联特定战报。
+ * 掷骰结果按战役隔离存储，支持场景标记。
  */
 "use server";
 import { auth } from "@/auth";
@@ -14,11 +9,19 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * 保存一次掷骰
+ * @param campaignId 战役 ID
  * @param formula 骰子公式，如 "d20", "2d6+3"
  * @param result 最终结果
  * @param details 详细信息，如 "[5, 3] + 2 = 10"
+ * @param scene 场景标记，如 "战斗·地精伏击"
  */
-export async function saveDiceRoll(formula: string, result: number, details: string) {
+export async function saveDiceRoll(
+  campaignId: string,
+  formula: string,
+  result: number,
+  details: string,
+  scene?: string,
+) {
   const session = await auth();
   if (!session?.user) return null;
 
@@ -27,20 +30,19 @@ export async function saveDiceRoll(formula: string, result: number, details: str
       formula,
       result,
       details,
+      scene: scene || null,
       userId: session.user.id!,
+      campaignId,
     },
   });
 }
 
 /**
- * 获取当前用户的掷骰历史（最近 50 条）
+ * 获取当前战役的掷骰历史（最近 50 条）
  */
-export async function getDiceHistory() {
-  const session = await auth();
-  if (!session?.user) return [];
-
+export async function getDiceHistory(campaignId: string) {
   return prisma.diceRoll.findMany({
-    where: { userId: session.user.id! },
+    where: { campaignId },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
