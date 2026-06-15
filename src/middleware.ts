@@ -2,7 +2,7 @@
  * 路由守卫中间件
  * 
  * Next.js 中间件在所有页面请求前执行，用于：
- * 1. 未登录用户 → 重定向到 /login（首页除外）
+ * 1. 未登录用户 → 重定向到 /login（首页、加入页除外）
  * 2. 已登录用户访问登录页 → 重定向到 /dashboard
  * 
  * auth() 是 NextAuth 的中间件辅助函数，
@@ -17,9 +17,12 @@ export default auth((req) => {
   const isAuthPage =
     req.nextUrl.pathname.startsWith("/login") ||
     req.nextUrl.pathname.startsWith("/register");
+  const isPublicPage =
+    req.nextUrl.pathname === "/" ||
+    req.nextUrl.pathname.startsWith("/join");
 
-  // 未登录 + 不是认证页 + 不是首页 → 跳到登录
-  if (!isLoggedIn && !isAuthPage && req.nextUrl.pathname !== "/") {
+  // 未登录 + 不是公开页 + 不是认证页 → 跳到登录
+  if (!isLoggedIn && !isAuthPage && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -32,7 +35,7 @@ export default auth((req) => {
 });
 
 // matcher: 哪些路径需要经过中间件
-// 排除 API 路由、静态文件、图标
+// 排除 API 路由、静态文件、图标、上传文件
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|uploads|favicon.ico).*)"],
 };

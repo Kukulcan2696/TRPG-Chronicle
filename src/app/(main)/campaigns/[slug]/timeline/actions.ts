@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export async function addTimelineEvent(campaignSlug: string, formData: FormData) {
   const session = await auth();
@@ -30,5 +31,28 @@ export async function addTimelineEvent(campaignSlug: string, formData: FormData)
     },
   });
 
+  revalidatePath(`/campaigns/${campaignSlug}/timeline`);
+}
+/**
+ * 编辑时间线事件
+ */
+export async function updateTimelineEvent(campaignSlug: string, eventId: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const title = formData.get("title") as string;
+  const description = formData.get("description") as string | null;
+  const gameDate = formData.get("gameDate") as string;
+  await prisma.timelineEvent.update({ where: { id: eventId }, data: { title, description, gameDate } });
+  revalidatePath(`/campaigns/${campaignSlug}/timeline`);
+  redirect(`/campaigns/${campaignSlug}/timeline`);
+}
+
+/**
+ * 删除时间线事件
+ */
+export async function deleteTimelineEvent(campaignSlug: string, eventId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  await prisma.timelineEvent.delete({ where: { id: eventId } });
   revalidatePath(`/campaigns/${campaignSlug}/timeline`);
 }

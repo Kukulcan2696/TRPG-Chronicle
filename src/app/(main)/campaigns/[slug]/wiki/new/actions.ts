@@ -1,3 +1,6 @@
+/**
+ * 创建百科条目 Server Action
+ */
 "use server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +14,6 @@ export async function createWikiEntry(campaignSlug: string, formData: FormData) 
   const slug = formData.get("slug") as string;
   const type = formData.get("type") as string;
   const content = formData.get("content") as string;
-  if (!title || !slug) throw new Error("Required");
   const campaign = await prisma.campaign.findUnique({ where: { slug: campaignSlug }, select: { id: true } });
   if (!campaign) throw new Error("Not found");
   const entry = await prisma.worldEntry.create({

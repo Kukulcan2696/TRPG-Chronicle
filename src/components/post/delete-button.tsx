@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,12 +39,7 @@ export function DeletePostButton({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger>
-        <Button variant="destructive" size="sm" type="button">
-          <Trash2 className="mr-1 h-4 w-4" />
-          删除
-        </Button>
-      </AlertDialogTrigger>
+      <AlertDialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-transparent bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 h-9 rounded-md px-3"><Trash2 className="mr-1 h-4 w-4" />删除</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>确认删除</AlertDialogTitle>

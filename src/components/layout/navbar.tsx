@@ -5,7 +5,7 @@
  * - Logo + 应用名
  * - 导航链接（仪表盘、战役）
  * - 暗色模式切换
- * - 用户头像下拉菜单（个人设置、管理、退出）
+ * - 用户头像下拉菜单（个人设置、退出）
  * 
  * 关键 Hooks：
  * - useSession(): 获取当前登录用户信息
@@ -21,12 +21,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
-import { Dice1, LogOut, User, Settings } from "lucide-react";
+import { Dice1, LogOut, User } from "lucide-react";
 
 // 导航项配置：添加新页面只需在这里加一项
 const navItems = [
@@ -82,16 +82,16 @@ export function Navbar() {
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>
-                  <p className="text-sm font-medium">{session.user.name}</p>
-                  <p className="text-xs text-muted-foreground">{session.user.email}</p>
-                </DropdownMenuLabel>
+                {/* GroupLabel 必须包裹在 Group 内（Base UI 要求） */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    <p className="text-sm font-medium">{session.user.name}</p>
+                    <p className="text-xs text-muted-foreground">{session.user.email}</p>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   <User className="mr-2 h-4 w-4" />个人设置
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/admin")}>
-                  <Settings className="mr-2 h-4 w-4" />管理
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="cursor-pointer text-destructive">

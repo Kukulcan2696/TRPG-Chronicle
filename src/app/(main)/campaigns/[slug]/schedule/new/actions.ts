@@ -1,3 +1,6 @@
+/**
+ * 创建排期场次 Server Action（仅 DM 可调用）
+ */
 "use server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +14,6 @@ export async function createScheduleEvent(campaignSlug: string, formData: FormDa
   const scheduledAt = formData.get("scheduledAt") as string;
   const location = formData.get("location") as string | null;
   const notes = formData.get("notes") as string | null;
-  if (!title || !scheduledAt) throw new Error("Required");
   const campaign = await prisma.campaign.findUnique({ where: { slug: campaignSlug }, select: { id: true } });
   if (!campaign) throw new Error("Not found");
   await prisma.scheduleEvent.create({

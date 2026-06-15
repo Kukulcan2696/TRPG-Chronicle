@@ -75,6 +75,7 @@ model Campaign {
   slug        String   @unique
   description String?
   coverImage  String?
+  inviteCode   String?  @unique
   dmId        String
 
   dm              User              @relation("DMCampaigns", fields: [dmId], references: [id])

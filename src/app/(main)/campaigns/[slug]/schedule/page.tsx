@@ -3,11 +3,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarPlus, Calendar, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { DeleteScheduleButton } from "@/components/schedule/delete-button";
 import { RSVPButtons } from "@/components/schedule/rsvp-buttons";
 
 interface PageProps { params: Promise<{ slug: string }> }
