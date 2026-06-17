@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dices, RotateCcw, Tag } from "lucide-react";
 import { saveDiceRoll, getDiceHistory } from "./actions";
+import { rollDice } from "@/lib/dice";
 
 interface RollRecord {
   id?: string;
@@ -25,23 +26,6 @@ interface RollRecord {
   details: string | null;
   scene: string | null;
   createdAt?: Date;
-}
-
-function rollDice(formula: string): { result: number; details: string } {
-  const match = formula.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
-  if (!match) return { result: 0, details: "无效公式" };
-  const count = parseInt(match[1] || "1");
-  const sides = parseInt(match[2]);
-  const mod = match[3] ? parseInt(match[3]) : 0;
-  const rolls: number[] = [];
-  for (let i = 0; i < count; i++) {
-    rolls.push(Math.floor(Math.random() * sides) + 1);
-  }
-  const total = rolls.reduce((a, b) => a + b, 0) + mod;
-  let detail = "[" + rolls.join(", ") + "]";
-  if (mod !== 0) detail += mod > 0 ? " + " + mod : " - " + (-mod);
-  detail += " = " + total;
-  return { result: total, details: detail };
 }
 
 function groupByScene(rolls: RollRecord[]): Map<string, RollRecord[]> {

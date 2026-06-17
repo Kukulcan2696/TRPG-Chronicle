@@ -18,8 +18,7 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 const ROLE_LABELS: Record<string, string> = {
-  PLAYER: "玩家",
-  DM: "DM",
+  USER: "用户",
   ADMIN: "管理员",
 };
 
@@ -57,7 +56,7 @@ export function AdminUserActions({
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {["PLAYER", "DM", "ADMIN"].map((role) => (
+        {["USER", "ADMIN"].map((role) => (
           <DropdownMenuItem
             key={role}
             onClick={() => handleRoleChange(role)}

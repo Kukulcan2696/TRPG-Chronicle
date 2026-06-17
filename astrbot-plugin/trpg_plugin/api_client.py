@@ -1,0 +1,172 @@
+"""
+HTTP API 客户端 — 封装对 Next.js Bot API 的所有调用
+"""
+
+from typing import Any, Dict, Optional, List
+
+import httpx
+
+
+class TrpgApiClient:
+    """异步 HTTP 客户端，封装对 Next.js Bot REST API 的调用"""
+
+    def __init__(self, base_url: str, api_key: str):
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.client = httpx.AsyncClient(timeout=15.0)
+
+    async def close(self):
+        await self.client.aclose()
+
+    async def _request(
+        self, method: str, path: str, **kwargs
+    ) -> Dict[str, Any]:
+        headers = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {self.api_key}"
+        headers["Content-Type"] = "application/json"
+
+        url = f"{self.base_url}{path}"
+        resp = await self.client.request(method, url, headers=headers, **kwargs)
+        resp.raise_for_status()
+        return resp.json()
+
+    # ── 掷骰 ──
+
+    async def roll_dice(
+        self,
+        formula: str,
+        campaign_id: str,
+        user_id: str,
+        scene: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/dice/roll",
+            json={
+                "formula": formula,
+                "campaignId": campaign_id,
+                "userId": user_id,
+                "scene": scene,
+            },
+        )
+
+    async def get_dice_history(
+        self, campaign_id: str, user_id: Optional[str] = None, limit: int = 20
+    ) -> Dict[str, Any]:
+        params = {"campaignId": campaign_id, "limit": str(limit)}
+        if user_id:
+            params["userId"] = user_id
+        return await self._request("GET", "/dice/history", params=params)
+
+    # ── 角色 ──
+
+    async def get_characters(
+        self, campaign_id: str, name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        params = {"campaignId": campaign_id}
+        if name:
+            params["name"] = name
+        return await self._request("GET", "/characters", params=params)
+
+    async def get_character_detail(self, char_id: str) -> Dict[str, Any]:
+        return await self._request("GET", f"/characters/{char_id}")
+
+    # ── 百科 ──
+
+    async def get_wiki_entries(
+        self,
+        campaign_id: str,
+        query: Optional[str] = None,
+        entry_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        params = {"campaignId": campaign_id}
+        if query:
+            params["q"] = query
+        if entry_type:
+            params["type"] = entry_type
+        return await self._request("GET", "/wiki", params=params)
+
+    # ── 战役 ──
+
+    async def get_campaign_info(self, campaign_id: str) -> Dict[str, Any]:
+        return await self._request("GET", "/campaign", params={"campaignId": campaign_id})
+
+    async def bind_group(
+        self, group_id: str, campaign_id: str = "", slug: str = ""
+    ) -> Dict[str, Any]:
+        body = {"groupId": group_id}
+        if campaign_id:
+            body["campaignId"] = campaign_id
+        elif slug:
+            body["slug"] = slug
+        return await self._request("POST", "/campaign/bind", json=body)
+
+    async def get_group_binding(self, group_id: str) -> Dict[str, Any]:
+        return await self._request("GET", "/campaign/bind", params={"groupId": group_id})
+
+    # ── 排期 ──
+
+    async def get_schedule(
+        self, campaign_id: str, upcoming: bool = True
+    ) -> Dict[str, Any]:
+        return await self._request(
+            "GET",
+            "/schedule",
+            params={"campaignId": campaign_id, "upcoming": str(upcoming).lower()},
+        )
+
+    # ── 随机表 ──
+
+    async def get_tables(self, campaign_id: str) -> Dict[str, Any]:
+        return await self._request("GET", "/tables", params={"campaignId": campaign_id})
+
+    async def roll_table(self, table_id: str) -> Dict[str, Any]:
+        return await self._request("POST", "/tables/roll", json={"tableId": table_id})
+
+    # ── 记录 ──
+
+    async def create_post(
+        self,
+        campaign_id: str,
+        title: str,
+        content: str,
+        user_id: str,
+        session_number: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        body = {
+            "campaignId": campaign_id,
+            "title": title,
+            "content": content,
+            "userId": user_id,
+        }
+        if session_number:
+            body["sessionNumber"] = session_number
+        return await self._request("POST", "/posts", json=body)
+
+    async def create_timeline_event(
+        self,
+        campaign_id: str,
+        title: str,
+        game_date: str,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        body = {
+            "campaignId": campaign_id,
+            "title": title,
+            "gameDate": game_date,
+        }
+        if description:
+            body["description"] = description
+        return await self._request("POST", "/timeline", json=body)
+
+    # ── 绑定 ──
+
+    async def get_user_binding(self, platform_id: str) -> Dict[str, Any]:
+        return await self._request("GET", "/binding", params={"platformId": platform_id})
+
+    async def bind_user(self, platform_id: str, user_id: str) -> Dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/binding",
+            json={"platformId": platform_id, "userId": user_id},
+        )

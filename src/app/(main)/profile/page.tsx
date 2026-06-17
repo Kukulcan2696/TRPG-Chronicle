@@ -108,7 +108,7 @@ export default async function ProfilePage() {
                 <Shield className="h-3.5 w-3.5" />
                 角色
               </Label>
-              <Input value={user.role === "DM" ? "DM（城主）" : "玩家"} disabled className="opacity-60" />
+              <Input value={user.role === "ADMIN" ? "管理员" : "用户"} disabled className="opacity-60" />
             </div>
 
             <Button type="submit">保存修改</Button>

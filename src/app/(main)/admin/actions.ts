@@ -20,7 +20,7 @@ export async function changeUserRole(userId: string, newRole: string) {
     throw new Error("不能修改自己的角色");
   }
 
-  if (!["PLAYER", "DM", "ADMIN"].includes(newRole)) {
+  if (!["USER", "ADMIN"].includes(newRole)) {
     throw new Error("无效的角色");
   }
 

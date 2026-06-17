@@ -13,7 +13,7 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
-  role          String    @default("PLAYER")
+  role          String    @default("USER")
   password      String?
 
   accounts         Account[]
@@ -28,6 +28,7 @@ model User {
   scheduleEvents   ScheduleEvent[]
   media            Media[]
   sessions         Session[]
+  botBindings      BotBinding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -88,6 +89,8 @@ model Campaign {
   scheduleEvents  ScheduleEvent[]
   diceRolls      DiceRoll[]
   media           Media[]
+  botBindings     BotBinding[]
+  groupBindings   GroupBinding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -265,4 +268,50 @@ model Media {
   uploadedBy User        @relation(fields: [uploadedById], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+// ── Bot API 密钥 ──
+model ApiKey {
+  id        String    @id @default(cuid())
+  name      String
+  key       String    @unique   // SHA-256 哈希
+  prefix    String              // 密钥前 8 字符，用于识别
+  lastUsedAt DateTime?
+  expiresAt DateTime?
+  enabled   Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── QQ 用户 ↔ 平台用户绑定 ──
+model BotBinding {
+  id         String  @id @default(cuid())
+  platform   String             // "qq"
+  platformId String            // QQ 号
+  userId     String
+  campaignId String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform, platformId])
+}
+
+// ── QQ 群 ↔ 战役绑定 ──
+model GroupBinding {
+  id         String @id @default(cuid())
+  platform   String            // "qq"
+  groupId    String            // QQ 群号
+  campaignId String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform, groupId])
 }
