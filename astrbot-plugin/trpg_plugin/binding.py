@@ -58,3 +58,10 @@ class BindingManager:
             self._campaign_cache.pop(group_id, None)
         else:
             self._campaign_cache.clear()
+
+    def invalidate_user_cache(self, platform_id: str = None):
+        """清除用户绑定缓存"""
+        if platform_id:
+            self._user_cache.pop(platform_id, None)
+        else:
+            self._user_cache.clear()

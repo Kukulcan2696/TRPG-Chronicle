@@ -34,6 +34,12 @@ export default async function EditCharacterPage({ params }: PageProps) {
   // 解析角色卡 JSON 数据
   const sheetData = JSON.parse(character.sheetData || "{}");
 
+  // 查询角色绑定的 QQ
+  const charBinding = await prisma.botBinding.findFirst({
+    where: { characterId: charId },
+    select: { platformId: true },
+  });
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -58,6 +64,20 @@ export default async function EditCharacterPage({ params }: PageProps) {
             <div className="space-y-2">
               <Label htmlFor="bio">背景简介</Label>
               <Textarea id="bio" name="bio" defaultValue={character.bio || ""} rows={4} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qqNumber">绑定 QQ</Label>
+              <Input
+                id="qqNumber"
+                name="qqNumber"
+                defaultValue={charBinding?.platformId || ""}
+                placeholder="输入 QQ 号（可选）"
+                pattern="\d{5,15}"
+              />
+              <p className="text-xs text-muted-foreground">
+                绑定后，该 QQ 号在群内掷骰和查角色时将关联到此角色
+              </p>
             </div>
 
             <div className="flex items-center gap-2">

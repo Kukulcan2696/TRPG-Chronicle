@@ -139,7 +139,7 @@ export default async function CampaignPage({ params }: PageProps) {
                     >
                       {post.title}
                       <span className="text-xs text-muted-foreground ml-2">
-                        by {post.author.name}
+                        by {post.author?.name ?? "未知用户"}
                       </span>
                     </Link>
                   </li>

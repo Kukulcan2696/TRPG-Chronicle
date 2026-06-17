@@ -176,7 +176,7 @@ async function OverviewTab() {
                       </Link>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground hidden sm:table-cell">{p.campaign.title}</td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground text-right hidden sm:table-cell">{p.author.name}</td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground text-right hidden sm:table-cell">{p.author?.name ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

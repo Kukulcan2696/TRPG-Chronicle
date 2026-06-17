@@ -28,6 +28,12 @@ export default async function CharacterPage({ params }: PageProps) {
       player: { select: { id: true, name: true, image: true } },
     },
   });
+
+  // 查询角色绑定的 QQ
+  const charBinding = await prisma.botBinding.findFirst({
+    where: { characterId: charId },
+    select: { platformId: true },
+  });
   if (!character || character.campaign.slug !== slug) notFound();
 
   const template = CHARACTER_TEMPLATES.find((t) => t.id === character.system);
@@ -42,6 +48,11 @@ export default async function CharacterPage({ params }: PageProps) {
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="secondary">{SYSTEM_LABELS[character.system] || character.system}</Badge>
             <span className="text-sm text-muted-foreground">by {character.player.name}</span>
+            {charBinding && (
+              <Badge variant="outline" className="text-xs">
+                QQ: {charBinding.platformId}
+              </Badge>
+            )}
           </div>
         </div>
       </div>

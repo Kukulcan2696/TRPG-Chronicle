@@ -78,7 +78,7 @@ export default async function PostsPage({ params }: PageProps) {
                         {post.title}
                       </CardTitle>
                       <CardDescription>
-                        by {post.author.name}
+                        by {post.author?.name ?? "未知用户"}
                         {post.gameDate && ` · ${format(new Date(post.gameDate), "yyyy年M月d日", { locale: zhCN })}`}
                       </CardDescription>
                     </div>

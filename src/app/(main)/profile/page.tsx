@@ -13,7 +13,7 @@
 
 import { auth } from "@/auth";
 import Link from "next/link";
-import { updateProfile } from "./actions";
+import { updateProfile, bindQQ, unbindQQ } from "./actions";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PortraitUpload } from "@/components/media/portrait-upload";
-import { ArrowLeft, User, Mail, Shield } from "lucide-react";
+import { ArrowLeft, User, Mail, Shield, Link as LinkIcon, Unlink } from "lucide-react";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -29,8 +29,13 @@ export default async function ProfilePage() {
   // 获取用户完整信息
   const user = await prisma.user.findUnique({
     where: { id: session?.user?.id },
-    select: { id: true, name: true, email: true, image: true, role: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, image: true, role: true, createdAt: true,
+      botBindings: { where: { platform: "qq" }, select: { platformId: true } },
+    },
   });
+
+  const qqBinding = user?.botBindings?.[0]?.platformId ?? null;
 
   if (!user) {
     return (
@@ -113,6 +118,47 @@ export default async function ProfilePage() {
 
             <Button type="submit">保存修改</Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* ===== QQ 绑定卡片 ===== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            QQ 绑定
+          </CardTitle>
+          <CardDescription>
+            {qqBinding
+              ? `已绑定 QQ: ${qqBinding}`
+              : "绑定 QQ 号后，机器人在群内可识别你的身份"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {qqBinding ? (
+            <form action={unbindQQ} className="flex items-center gap-3">
+              <input type="hidden" name="qqNumber" value={qqBinding} />
+              <Input value={qqBinding} disabled className="flex-1 opacity-60" />
+              <Button type="submit" variant="destructive" size="sm">
+                <Unlink className="h-4 w-4 mr-1" />
+                解绑
+              </Button>
+            </form>
+          ) : (
+            <form action={bindQQ} className="flex items-center gap-3">
+              <Input
+                name="qqNumber"
+                placeholder="输入 QQ 号"
+                className="flex-1"
+                pattern="\d{5,15}"
+                required
+              />
+              <Button type="submit" size="sm">
+                <LinkIcon className="h-4 w-4 mr-1" />
+                绑定
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
 

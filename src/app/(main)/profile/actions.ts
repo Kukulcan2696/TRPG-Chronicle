@@ -60,3 +60,51 @@ export async function updateProfile(formData: FormData) {
 
   revalidatePath("/profile");
 }
+
+/**
+ * 绑定 QQ 号到当前用户
+ */
+export async function bindQQ(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("未登录");
+
+  const qqNumber = (formData.get("qqNumber") as string)?.trim();
+  if (!qqNumber || !/^\d{5,15}$/.test(qqNumber)) {
+    throw new Error("请输入有效的 QQ 号（5-15 位数字）");
+  }
+
+  await prisma.botBinding.upsert({
+    where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+    update: { userId: session.user.id },
+    create: {
+      platform: "qq",
+      platformId: qqNumber,
+      userId: session.user.id,
+    },
+  });
+
+  revalidatePath("/profile");
+}
+
+/**
+ * 解绑当前用户的 QQ 号
+ */
+export async function unbindQQ(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("未登录");
+
+  const qqNumber = (formData.get("qqNumber") as string)?.trim();
+  if (!qqNumber) throw new Error("缺少 QQ 号");
+
+  // 仅删除属于当前用户的绑定
+  const binding = await prisma.botBinding.findUnique({
+    where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+  });
+  if (binding && binding.userId === session.user.id) {
+    await prisma.botBinding.delete({
+      where: { id: binding.id },
+    });
+  }
+
+  revalidatePath("/profile");
+}

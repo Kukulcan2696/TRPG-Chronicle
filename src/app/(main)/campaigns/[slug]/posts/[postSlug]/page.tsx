@@ -30,7 +30,7 @@ export default async function PostPage({ params }: PageProps) {
 
   if (!post) notFound();
 
-  const isAuthor = session?.user?.id === post.author.id;
+  const isAuthor = session?.user?.id && post.author && session.user.id === post.author.id;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -76,12 +76,12 @@ export default async function PostPage({ params }: PageProps) {
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={post.author.image || ""} />
+                <AvatarImage src={post.author?.image || ""} />
                 <AvatarFallback>
-                  {post.author.name?.charAt(0) || "U"}
+                  {post.author?.name?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
-              <span>{post.author.name}</span>
+              <span>{post.author?.name ?? "未知用户"}</span>
             </div>
             {post.gameDate && (
               <div className="flex items-center gap-1">

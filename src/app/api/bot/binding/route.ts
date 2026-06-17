@@ -51,18 +51,39 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    const { platformId, userId } = await req.json();
+    const { platformId, userId, email } = await req.json();
 
-    if (!platformId || !userId) {
+    if (!platformId) {
       return NextResponse.json(
-        { error: "缺少必要参数: platformId, userId" },
+        { error: "缺少必要参数: platformId" },
+        { status: 400 }
+      );
+    }
+
+    let resolvedUserId = userId;
+
+    // 支持通过邮箱查找用户
+    if (!resolvedUserId && email) {
+      const userByEmail = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (!userByEmail) {
+        return NextResponse.json({ error: "邮箱未注册" }, { status: 404 });
+      }
+      resolvedUserId = userByEmail.id;
+    }
+
+    if (!resolvedUserId) {
+      return NextResponse.json(
+        { error: "缺少必要参数: userId 或 email" },
         { status: 400 }
       );
     }
 
     // 验证用户存在
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: resolvedUserId },
       select: { id: true },
     });
     if (!user) {
@@ -71,8 +92,8 @@ export async function POST(req: NextRequest) {
 
     const binding = await prisma.botBinding.upsert({
       where: { platform_platformId: { platform: "qq", platformId } },
-      update: { userId },
-      create: { platform: "qq", platformId, userId },
+      update: { userId: resolvedUserId },
+      create: { platform: "qq", platformId, userId: resolvedUserId },
     });
 
     return NextResponse.json({ success: true, binding });

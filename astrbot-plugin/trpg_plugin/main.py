@@ -241,8 +241,31 @@ class TrpgPlugin(Star):
             logger.error(f"[TRPG] 绑定失败: {e}")
             yield event.plain_result(f"❌ 绑定失败: {e}。请确认 slug 正确。")
 
+    @filter.command("bindqq")
+    async def cmd_bindqq(self, event: AstrMessageEvent, email: str = ""):
+        """绑定 QQ 号到平台账号。用法: /bindqq <邮箱>"""
+        sender_id = event.get_sender_id()
+        if not email:
+            yield event.plain_result(
+                "用法: /bindqq <邮箱>\n示例: /bindqq admin@trpg.local\n"
+                "将当前 QQ 号绑定到对应邮箱的平台账号。"
+            )
+            return
+
+        # 简单校验邮箱格式
+        if "@" not in email or "." not in email:
+            yield event.plain_result("⚠ 邮箱格式不正确")
+            return
+
+        try:
+            await self.api.bind_user_by_email(sender_id, email)
+            self.binding.invalidate_user_cache(sender_id)
+            yield event.plain_result(f"✅ QQ {sender_id} 已绑定到 {email}")
+        except Exception as e:
+            logger.error(f"[TRPG] 用户绑定失败: {e}")
+            yield event.plain_result(f"❌ 绑定失败: {e}。请确认邮箱已注册平台账号。")
+
     @filter.command("unbind")
-    async def cmd_unbind(self, event: AstrMessageEvent):
         """解绑 QQ 群。用法: !unbind"""
         group_id = event.get_group_id()
         if not group_id:
@@ -435,6 +458,7 @@ class TrpgPlugin(Star):
 
 **管理**
   !bind <slug>      绑定QQ群到战役（DM）
+  !bindqq <邮箱>    绑定QQ号到平台账号
   !trpghelp         显示此帮助
 
 📖 网站: 查看完整数据请登录平台"""

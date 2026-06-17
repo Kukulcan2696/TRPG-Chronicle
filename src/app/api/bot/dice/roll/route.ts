@@ -17,11 +17,32 @@ export async function POST(req: NextRequest) {
   try {
     const { formula, campaignId, userId, scene } = await req.json();
 
-    if (!formula || !campaignId || !userId) {
+    if (!formula || !campaignId) {
       return NextResponse.json(
-        { error: "缺少必要参数: formula, campaignId, userId" },
+        { error: "缺少必要参数: formula, campaignId" },
         { status: 400 }
       );
+    }
+
+    // 校验 userId（若提供）：查 BotBinding 或验证 User 是否存在
+    // 未绑定 QQ 用户也能掷骰，记录不关联平台用户
+    let resolvedUserId: string | null = null;
+    if (userId) {
+      // 先检查是否为合法平台用户 ID
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (user) {
+        resolvedUserId = userId;
+      } else {
+        // userId 可能是 QQ 号，尝试通过 BotBinding 查找
+        const binding = await prisma.botBinding.findUnique({
+          where: { platform_platformId: { platform: "qq", platformId: userId } },
+          select: { userId: true },
+        });
+        resolvedUserId = binding?.userId ?? null;
+      }
     }
 
     if (!isValidDiceFormula(formula)) {
@@ -46,7 +67,7 @@ export async function POST(req: NextRequest) {
         details,
         scene: scene || null,
         campaignId,
-        userId,
+        userId: resolvedUserId,
       },
     });
 

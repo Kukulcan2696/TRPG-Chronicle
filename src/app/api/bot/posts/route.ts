@@ -18,11 +18,30 @@ export async function POST(req: NextRequest) {
     const { campaignId, title, content, userId, sessionNumber, published } =
       await req.json();
 
-    if (!campaignId || !title || !content || !userId) {
+    if (!campaignId || !title || !content) {
       return NextResponse.json(
-        { error: "缺少必要参数: campaignId, title, content, userId" },
+        { error: "缺少必要参数: campaignId, title, content" },
         { status: 400 }
       );
+    }
+
+    // 校验 authorId（若提供）：查 BotBinding 或验证 User 是否存在
+    let resolvedAuthorId: string | null = null;
+    const authorId = userId; // body 中字段名为 userId
+    if (authorId) {
+      const user = await prisma.user.findUnique({
+        where: { id: authorId },
+        select: { id: true },
+      });
+      if (user) {
+        resolvedAuthorId = authorId;
+      } else {
+        const binding = await prisma.botBinding.findUnique({
+          where: { platform_platformId: { platform: "qq", platformId: authorId } },
+          select: { userId: true },
+        });
+        resolvedAuthorId = binding?.userId ?? null;
+      }
     }
 
     // 生成 slug：基于标题 + 时间戳后 6 位
@@ -45,7 +64,7 @@ export async function POST(req: NextRequest) {
         content,
         excerpt,
         campaignId,
-        authorId: userId,
+        authorId: resolvedAuthorId,
         sessionNumber: sessionNumber || null,
         published: published ?? false,
       },

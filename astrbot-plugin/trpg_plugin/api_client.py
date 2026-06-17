@@ -170,3 +170,13 @@ class TrpgApiClient:
             "/binding",
             json={"platformId": platform_id, "userId": user_id},
         )
+
+    async def bind_user_by_email(
+        self, platform_id: str, email: str
+    ) -> Dict[str, Any]:
+        """通过邮箱绑定 QQ 号到平台用户"""
+        return await self._request(
+            "POST",
+            "/binding",
+            json={"platformId": platform_id, "email": email},
+        )
