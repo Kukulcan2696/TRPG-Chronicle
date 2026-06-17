@@ -266,6 +266,7 @@ class TrpgPlugin(Star):
             yield event.plain_result(f"❌ 绑定失败: {e}。请确认邮箱已注册平台账号。")
 
     @filter.command("unbind")
+    async def cmd_unbind(self, event: AstrMessageEvent):
         """解绑 QQ 群。用法: !unbind"""
         group_id = event.get_group_id()
         if not group_id:
