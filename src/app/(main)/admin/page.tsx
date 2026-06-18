@@ -19,6 +19,11 @@ import {
 import { AdminUserActions } from "./user-actions";
 import { AdminDeleteCampaign } from "./campaign-actions";
 import { AdminTabNav } from "./tab-nav";
+import { DiceTab } from "./dice-tab";
+import { CharactersTab } from "./characters-tab";
+import { PostsTab } from "./posts-tab";
+import { BindingsTab } from "./bindings-tab";
+import { AuditLogTab } from "./audit-log-tab";
 
 const PAGE_SIZE = 15;
 
@@ -68,6 +73,21 @@ export default async function AdminPage({
 
       {/* ===== 战役管理标签页 ===== */}
       {tab === "campaigns" && <CampaignsTab page={page} query={query} />}
+
+      {/* ===== 掷骰记录标签页 ===== */}
+      {tab === "dice" && <DiceTab page={page} query={query} />}
+
+      {/* ===== 角色管理标签页 ===== */}
+      {tab === "characters" && <CharactersTab page={page} query={query} />}
+
+      {/* ===== 战报管理标签页 ===== */}
+      {tab === "posts" && <PostsTab page={page} query={query} />}
+
+      {/* ===== 绑定管理标签页 ===== */}
+      {tab === "bindings" && <BindingsTab />}
+
+      {/* ===== 操作日志标签页 ===== */}
+      {tab === "audit" && <AuditLogTab page={page} />}
     </div>
   );
 }

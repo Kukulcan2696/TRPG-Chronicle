@@ -10,6 +10,47 @@ import { withBotAuth } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { markdownToExcerpt } from "@/lib/markdown";
 
+/**
+ * GET /api/bot/posts — 查询战报列表
+ * Query: campaignId, limit?, published? (默认返回已发布)
+ */
+export async function GET(req: NextRequest) {
+  const authError = await withBotAuth(req);
+  if (authError) return authError;
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const campaignId = searchParams.get("campaignId");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+    const published = searchParams.get("published") !== "false"; // 默认 true
+
+    if (!campaignId) {
+      return NextResponse.json({ error: "缺少参数: campaignId" }, { status: 400 });
+    }
+
+    const posts = await prisma.post.findMany({
+      where: { campaignId, published },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        sessionNumber: true,
+        gameDate: true,
+        createdAt: true,
+        author: { select: { name: true } },
+      },
+    });
+
+    return NextResponse.json({ posts });
+  } catch (error) {
+    console.error("战报查询 API 错误:", error);
+    return NextResponse.json({ error: "服务器错误" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const authError = await withBotAuth(req);
   if (authError) return authError;
@@ -38,7 +79,7 @@ export async function POST(req: NextRequest) {
       } else {
         const binding = await prisma.botBinding.findUnique({
           where: { platform_platformId: { platform: "qq", platformId: authorId } },
-          select: { userId: true },
+          select: { userId: true, characterId: true },
         });
         resolvedAuthorId = binding?.userId ?? null;
       }

@@ -38,17 +38,26 @@ class TrpgApiClient:
         campaign_id: str,
         user_id: str,
         scene: Optional[str] = None,
+        character_id: Optional[str] = None,
+        reason: Optional[str] = None,
+        difficulty_class: Optional[int] = None,
+        roll_type: str = "GENERAL",
     ) -> Dict[str, Any]:
-        return await self._request(
-            "POST",
-            "/dice/roll",
-            json={
-                "formula": formula,
-                "campaignId": campaign_id,
-                "userId": user_id,
-                "scene": scene,
-            },
-        )
+        body: Dict[str, Any] = {
+            "formula": formula,
+            "campaignId": campaign_id,
+            "userId": user_id,
+            "rollType": roll_type,
+        }
+        if scene:
+            body["scene"] = scene
+        if character_id:
+            body["characterId"] = character_id
+        if reason:
+            body["reason"] = reason
+        if difficulty_class is not None:
+            body["difficultyClass"] = difficulty_class
+        return await self._request("POST", "/dice/roll", json=body)
 
     async def get_dice_history(
         self, campaign_id: str, user_id: Optional[str] = None, limit: int = 20
@@ -61,11 +70,16 @@ class TrpgApiClient:
     # ── 角色 ──
 
     async def get_characters(
-        self, campaign_id: str, name: Optional[str] = None
+        self,
+        campaign_id: str,
+        name: Optional[str] = None,
+        platform_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        params = {"campaignId": campaign_id}
+        params: Dict[str, str] = {"campaignId": campaign_id}
         if name:
             params["name"] = name
+        if platform_id:
+            params["platformId"] = platform_id
         return await self._request("GET", "/characters", params=params)
 
     async def get_character_detail(self, char_id: str) -> Dict[str, Any]:
@@ -104,6 +118,9 @@ class TrpgApiClient:
     async def get_group_binding(self, group_id: str) -> Dict[str, Any]:
         return await self._request("GET", "/campaign/bind", params={"groupId": group_id})
 
+    async def unbind_group(self, group_id: str) -> Dict[str, Any]:
+        return await self._request("DELETE", "/campaign/bind", params={"groupId": group_id})
+
     # ── 排期 ──
 
     async def get_schedule(
@@ -113,6 +130,19 @@ class TrpgApiClient:
             "GET",
             "/schedule",
             params={"campaignId": campaign_id, "upcoming": str(upcoming).lower()},
+        )
+
+    async def rsvp(
+        self, schedule_event_id: str, user_id: str, status: str
+    ) -> Dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/schedule/rsvp",
+            json={
+                "scheduleEventId": schedule_event_id,
+                "userId": user_id,
+                "status": status,
+            },
         )
 
     # ── 随机表 ──

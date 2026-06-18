@@ -25,15 +25,49 @@ export async function updateCharacter(campaignSlug: string, charId: string, form
   const name = formData.get("name") as string;
   const bio = formData.get("bio") as string | null;
   const isPublic = formData.get("isPublic") === "true";
+  const status = (formData.get("status") as string) || char.status;
   const portrait = (formData.get("portrait") as string) || null;
   const qqNumber = (formData.get("qqNumber") as string)?.trim() || null;
 
-  // 合并 sheet_ 字段到现有数据（保留未编辑的字段）
-  const existingData = JSON.parse(char.sheetData || "{}");
+  // 合并自定义字段到现有数据
+  const topKeys = ["name", "bio", "isPublic", "portrait", "qqNumber", "status"];
+  const existingData: Record<string, any> = JSON.parse(char.sheetData || "{}");
+
+  // 处理现有字段更新和新增字段
+  const newKeyVals: [string, string][] = []; // [key, val] pairs from new field slots
+
   for (const [key, value] of formData.entries()) {
-    if (!["name", "bio", "isPublic", "portrait", "qqNumber"].includes(key)) {
-      existingData[key] = value;
+    if (topKeys.includes(key)) continue;
+    const strVal = value as string;
+
+    if (key.startsWith("field_new_key_")) {
+      // 新增字段的键名
+      const idx = key.replace("field_new_key_", "");
+      const valKey = `field_new_val_${idx}`;
+      const valVal = (formData.get(valKey) as string) || "";
+      if (strVal.trim()) {
+        newKeyVals.push([strVal.trim(), valVal]);
+      }
+      continue;
     }
+    if (key.startsWith("field_new_val_")) continue; // handled with key pair
+
+    // 现有字段：去掉前缀
+    const cleanKey = key.startsWith("field_") ? key.slice(6)
+      : key.startsWith("sheet_") ? key.slice(6)
+      : key;
+
+    // 如果值为空字符串，删除该字段；否则更新
+    if (strVal === "") {
+      delete existingData[cleanKey];
+    } else {
+      existingData[cleanKey] = strVal;
+    }
+  }
+
+  // 应用新字段
+  for (const [k, v] of newKeyVals) {
+    existingData[k] = v;
   }
 
   await prisma.character.update({
@@ -42,6 +76,7 @@ export async function updateCharacter(campaignSlug: string, charId: string, form
       name,
       bio,
       isPublic,
+      status,
       portrait,
       sheetData: JSON.stringify(existingData),
     },
@@ -49,6 +84,21 @@ export async function updateCharacter(campaignSlug: string, charId: string, form
 
   // 处理 QQ 绑定
   if (qqNumber && /^\d{5,15}$/.test(qqNumber)) {
+    // 检查冲突：该 QQ 是否已被其他用户或其他角色绑定
+    const existingBinding = await prisma.botBinding.findUnique({
+      where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+      select: { userId: true, characterId: true, character: { select: { name: true } } },
+    });
+    if (existingBinding) {
+      if (existingBinding.userId !== session.user.id) {
+        throw new Error("该 QQ 号已被其他用户绑定");
+      }
+      if (existingBinding.characterId && existingBinding.characterId !== charId) {
+        throw new Error(
+          `该 QQ 号已绑定到角色「${existingBinding.character?.name || "未知"}」，请先解绑该角色`
+        );
+      }
+    }
     // 绑定/更新：upsert BotBinding
     await prisma.botBinding.upsert({
       where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
@@ -61,12 +111,15 @@ export async function updateCharacter(campaignSlug: string, charId: string, form
       },
     });
   } else if (qqNumber === "") {
-    // 清空：删除该角色的 BotBinding
+    // 清空角色绑定：仅清除 characterId，保留用户绑定
     const existingBinding = await prisma.botBinding.findFirst({
       where: { characterId: charId },
     });
     if (existingBinding) {
-      await prisma.botBinding.delete({ where: { id: existingBinding.id } });
+      await prisma.botBinding.update({
+        where: { id: existingBinding.id },
+        data: { characterId: null, campaignId: null },
+      });
     }
   }
   // qqNumber === null 表示表单中没有该字段（不应该发生，但安全处理）

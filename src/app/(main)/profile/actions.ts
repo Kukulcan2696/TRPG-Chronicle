@@ -73,6 +73,22 @@ export async function bindQQ(formData: FormData) {
     throw new Error("请输入有效的 QQ 号（5-15 位数字）");
   }
 
+  // 检查是否已被其他用户绑定
+  const existing = await prisma.botBinding.findUnique({
+    where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+    select: { userId: true, characterId: true },
+  });
+  if (existing && existing.userId !== session.user.id) {
+    // 查询占用者的用户名
+    const owner = await prisma.user.findUnique({
+      where: { id: existing.userId },
+      select: { name: true },
+    });
+    throw new Error(
+      `该 QQ 号已被用户「${owner?.name || "未知"}」绑定，请勿重复绑定`
+    );
+  }
+
   await prisma.botBinding.upsert({
     where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
     update: { userId: session.user.id },
@@ -88,6 +104,7 @@ export async function bindQQ(formData: FormData) {
 
 /**
  * 解绑当前用户的 QQ 号
+ * 若该 QQ 已绑定角色，同时移除角色关联
  */
 export async function unbindQQ(formData: FormData) {
   const session = await auth();
@@ -99,8 +116,12 @@ export async function unbindQQ(formData: FormData) {
   // 仅删除属于当前用户的绑定
   const binding = await prisma.botBinding.findUnique({
     where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+    select: { id: true, userId: true, characterId: true, character: { select: { name: true } } },
   });
+
   if (binding && binding.userId === session.user.id) {
+    // 如果有关联角色，先清除角色绑定，再删除
+    // 这样角色编辑页的"清空QQ"逻辑保持一致
     await prisma.botBinding.delete({
       where: { id: binding.id },
     });

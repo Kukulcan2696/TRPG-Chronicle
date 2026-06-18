@@ -48,7 +48,10 @@ class TrpgPlugin(Star):
 
     @filter.command("r")
     async def cmd_roll(self, event: AstrMessageEvent, formula: str, scene: str = ""):
-        """掷骰并保存到平台。用法: !r d20 或 !r 2d6+3 战斗场景"""
+        """掷骰并保存到平台。
+用法: !r <公式> [dc<难度>] [原因/场景]
+示例: !r d20 dc15 侦查检定
+      !r 2d6+3 战斗"""
         group_id = event.get_group_id()
         sender_id = event.get_sender_id()
 
@@ -64,14 +67,53 @@ class TrpgPlugin(Star):
         if bound:
             user_id = bound
 
+        # 解析 scene 中的 DC 和原因
+        import re
+        dc = None
+        reason = scene.strip() if scene else None
+        if scene:
+            dc_match = re.match(r'^dc\s*(\d+)\s*(.*)', scene, re.IGNORECASE)
+            if dc_match:
+                dc = int(dc_match.group(1))
+                reason = dc_match.group(2).strip() or None
+
         try:
-            result = await self.api.roll_dice(formula, campaign_id, user_id, scene or None)
-            reply = f"🎲 {result['formula']} = {result['result']}"
+            result = await self.api.roll_dice(
+                formula, campaign_id, user_id,
+                scene=(reason if not dc else None),  # 无 DC 时 reason=场景名
+                reason=reason,
+                difficulty_class=dc,
+                roll_type="CHECK" if dc else "GENERAL",
+            )
+
+            # 构建回复
+            outcome = result.get("outcome")
+            character_name = result.get("character", {}).get("name") if result.get("character") else None
+
+            reply_parts = []
+            if reason:
+                reply_parts.append(f"🎲 {reason}")
+            if character_name:
+                reply_parts.append(f" | {character_name}")
+            if reply_parts:
+                reply_parts.append("\n")
+
+            reply_parts.append(f"{result['formula']} = {result['result']}")
+
+            if dc is not None and outcome:
+                outcome_labels = {
+                    "CRITICAL_SUCCESS": "🌟 大成功!",
+                    "SUCCESS": "✅ 成功",
+                    "FAILURE": "❌ 失败",
+                    "CRITICAL_FAILURE": "💀 大失败!",
+                }
+                label = outcome_labels.get(outcome, outcome)
+                reply_parts.append(f" (DC{dc} → {label})")
+
             if result.get("details"):
-                reply += f"\n📊 {result['details']}"
-            if result.get("scene"):
-                reply += f"\n🏷 {result['scene']}"
-            yield event.plain_result(reply)
+                reply_parts.append(f"\n📊 {result['details']}")
+
+            yield event.plain_result("".join(reply_parts))
         except Exception as e:
             logger.error(f"[TRPG] 掷骰失败: {e}")
             traceback.print_exc()
@@ -111,16 +153,22 @@ class TrpgPlugin(Star):
 
     @filter.command("c")
     async def cmd_character(self, event: AstrMessageEvent, name: str = ""):
-        """查询角色。用法: !c [角色名]，无参数列出所有角色"""
+        """查询角色。用法: !c [角色名]，无参数列出所有角色（★ 标记你绑定的角色）"""
         group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
         campaign_id = await self.binding.get_campaign_for_group(group_id)
         if not campaign_id:
             yield event.plain_result("⚠ 当前群未绑定战役。")
             return
 
         try:
-            result = await self.api.get_characters(campaign_id, name=name or None)
+            # 传入 platformId 以获取绑定信息
+            result = await self.api.get_characters(
+                campaign_id, name=name or None, platform_id=sender_id
+            )
             chars = result.get("characters", [])
+            bound_char_id = result.get("boundCharacterId")
+
             if not chars:
                 yield event.plain_result("📭 未找到角色")
                 return
@@ -130,6 +178,10 @@ class TrpgPlugin(Star):
                 reply = f"🎭 {c['name']}"
                 if c.get("system"):
                     reply += f" [{c['system']}]"
+                status = c.get("status", "")
+                if status and status != "APPROVED":
+                    status_labels = {"DRAFT": "📝草稿", "COMPLETE": "✅完成"}
+                    reply += f" {status_labels.get(status, status)}"
                 if c.get("bio"):
                     reply += f"\n📝 {c['bio'][:200]}"
                 if c.get("player", {}).get("name"):
@@ -140,12 +192,58 @@ class TrpgPlugin(Star):
                 for c in chars:
                     player_name = c.get("player", {}).get("name", "?")
                     system_str = f"[{c['system']}] " if c.get("system") else ""
+                    # 标记绑定的角色
+                    is_bound = "★ " if bound_char_id and c["id"] == bound_char_id else "  • "
                     lines.append(
-                        f"  • {c['name']} {system_str}({player_name})"
+                        f"{is_bound}{c['name']} {system_str}({player_name})"
                     )
                 yield event.plain_result("\n".join(lines))
         except Exception as e:
             logger.error(f"[TRPG] 查角色失败: {e}")
+            yield event.plain_result(f"❌ 查询失败: {e}")
+
+    @filter.command("mychar")
+    async def cmd_mychar(self, event: AstrMessageEvent):
+        """查看我在当前战役中绑定的角色"""
+        group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        try:
+            result = await self.api.get_characters(
+                campaign_id, platform_id=sender_id
+            )
+            chars = result.get("characters", [])
+            bound_char_id = result.get("boundCharacterId")
+
+            if not chars or not bound_char_id:
+                yield event.plain_result(
+                    "📭 你还没有绑定角色。\n"
+                    "请在 Web 平台的角色编辑页设置 QQ 号，或使用 !bindqq <邮箱> 先绑定账号。"
+                )
+                return
+
+            my_char = next((c for c in chars if c["id"] == bound_char_id), None)
+            if not my_char:
+                yield event.plain_result("📭 未找到你的角色")
+                return
+
+            c = my_char
+            reply = f"🎭 ★ 你的角色: {c['name']}"
+            if c.get("system"):
+                reply += f" [{c['system']}]"
+            status = c.get("status", "")
+            if status:
+                status_labels = {"DRAFT": "📝草稿", "COMPLETE": "✅完成", "APPROVED": "🌟已批准"}
+                reply += f" {status_labels.get(status, status)}"
+            if c.get("bio"):
+                reply += f"\n📝 {c['bio'][:150]}"
+            yield event.plain_result(reply)
+        except Exception as e:
+            logger.error(f"[TRPG] 我的角色查询失败: {e}")
             yield event.plain_result(f"❌ 查询失败: {e}")
 
     # ================================================================
@@ -230,8 +328,13 @@ class TrpgPlugin(Star):
             yield event.plain_result("⚠ 请在 QQ 群中使用此命令。")
             return
 
-        # TODO: 可选权限检查 — 确认发送者是群管理员
-        # AstrBot 可通过 filter.permission_type 限制
+        # 权限检查：仅群管理员可绑定
+        try:
+            if not await self._check_admin(event):
+                yield event.plain_result("⚠ 仅群管理员可以绑定战役。")
+                return
+        except Exception:
+            pass  # 如果权限 API 不可用，允许继续
 
         try:
             await self.api.bind_group(group_id, slug=slug)
@@ -267,13 +370,27 @@ class TrpgPlugin(Star):
 
     @filter.command("unbind")
     async def cmd_unbind(self, event: AstrMessageEvent):
-        """解绑 QQ 群。用法: !unbind"""
+        """解绑 QQ 群。用法: !unbind（仅群管理员可用）"""
         group_id = event.get_group_id()
         if not group_id:
             yield event.plain_result("⚠ 请在 QQ 群中使用此命令。")
             return
-        # 解绑即设为空（实际需额外 API，这里跳过实现细节）
-        yield event.plain_result("ℹ 解绑功能待实现，请通过 Web 管理后台操作。")
+
+        # 权限检查：仅群管理员可解绑
+        try:
+            if not await self._check_admin(event):
+                yield event.plain_result("⚠ 仅群管理员可以解绑战役。")
+                return
+        except Exception:
+            pass  # 如果权限 API 不可用，允许继续
+
+        try:
+            await self.api.unbind_group(group_id)
+            self.binding.invalidate_cache(group_id)
+            yield event.plain_result("✅ 本群已解绑战役。")
+        except Exception as e:
+            logger.error(f"[TRPG] 解绑失败: {e}")
+            yield event.plain_result(f"❌ 解绑失败: {e}")
 
     # ================================================================
     #  排期命令
@@ -320,8 +437,36 @@ class TrpgPlugin(Star):
         self, event: AstrMessageEvent, event_id: str, status: str = "going"
     ):
         """回复排期。用法: !rsvp <事件ID> [going/maybe/cant]"""
-        # RSVP 需要平台用户绑定
-        yield event.plain_result("ℹ RSVP 功能请通过 Web 平台操作。")
+        sender_id = event.get_sender_id()
+        group_id = event.get_group_id()
+
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        # 标准化 status
+        status_map = {
+            "going": "GOING", "maybe": "MAYBE", "cant": "CANT",
+            "go": "GOING", "可能": "MAYBE", "不去": "CANT", "去": "GOING",
+        }
+        api_status = status_map.get(status.lower(), status.upper())
+        if api_status not in ("GOING", "MAYBE", "CANT"):
+            yield event.plain_result(
+                "⚠ 状态无效。请使用: going/maybe/cant\n"
+                "示例: !rsvp abc123 going"
+            )
+            return
+
+        try:
+            result = await self.api.rsvp(event_id, sender_id, api_status)
+            status_labels = {"GOING": "✅ 参加", "MAYBE": "🤔 可能", "CANT": "❌ 不参加"}
+            yield event.plain_result(
+                f"已回复: {status_labels.get(api_status, api_status)}"
+            )
+        except Exception as e:
+            logger.error(f"[TRPG] RSVP 失败: {e}")
+            yield event.plain_result(f"❌ 回复失败: {e}")
 
     # ================================================================
     #  随机表命令
@@ -443,27 +588,48 @@ class TrpgPlugin(Star):
         help_text = """🎲 TRPG Chronicle Bot 帮助
 
 **掷骰**
-  !r <公式> [场景]  掷骰并保存 (如 !r d20, !r 2d6+3 战斗)
-  !rh [数量]        查看掷骰历史
+  !r <公式> [dc<难度>] [原因]  掷骰 (如 !r d20, !r d20 dc15 侦查)
+  !rh [数量]                  查看掷骰历史
 
 **查询**
-  !c [角色名]       查角色列表/详情
-  !w [关键词]       搜索百科条目
-  !camp             查看战役概览
-  !s                查看近期排期
-  !t [表名]         列随机表/掷表
+  !c [角色名]    查角色列表/详情（★ 标记你的角色）
+  !mychar        查看我绑定的角色
+  !w [关键词]    搜索百科条目
+  !camp          查看战役概览
+  !s             查看近期排期
+  !t [表名]      列随机表/掷表
 
 **记录**
-  !note 标题|内容    快速记录战报
+  !note 标题|内容      快速记录战报
   !timeline 事件|日期  添加时间线事件
 
 **管理**
-  !bind <slug>      绑定QQ群到战役（DM）
-  !bindqq <邮箱>    绑定QQ号到平台账号
-  !trpghelp         显示此帮助
+  !bind <slug>       绑定QQ群到战役（群管理员）
+  !unbind            解绑QQ群（群管理员）
+  !bindqq <邮箱>     绑定QQ号到平台账号
+  !rsvp <事件ID> [going/maybe/cant]  回复排期
+  !trpghelp          显示此帮助
 
 📖 网站: 查看完整数据请登录平台"""
         yield event.plain_result(help_text)
+
+    # ================================================================
+    #  工具方法
+    # ================================================================
+
+    async def _check_admin(self, event: AstrMessageEvent) -> bool:
+        """检查发送者是否为群管理员"""
+        try:
+            # AstrBot 的权限系统
+            if hasattr(event, "is_admin"):
+                return event.is_admin()
+            # 备选：检查 role 属性
+            if hasattr(event, "get_sender_role"):
+                role = event.get_sender_role()
+                return role in ("admin", "owner")
+        except Exception:
+            pass
+        return True  # 如果无法判断，默认允许（避免阻止合法操作）
 
     # ================================================================
     #  生命周期

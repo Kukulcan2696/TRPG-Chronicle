@@ -44,16 +44,16 @@ function RenderField({ field }: { field: SheetField }) {
   if (field.type === "textarea") {
     return (
       <div className="col-span-full space-y-1.5">
-        <Label htmlFor={`sheet_${field.key}`} className="text-xs">{field.label}</Label>
-        <Textarea id={`sheet_${field.key}`} name={`sheet_${field.key}`} placeholder={field.placeholder} rows={3} className="text-sm" defaultValue={field.defaultValue} />
+        <Label htmlFor={`field_${field.key}`} className="text-xs">{field.label}</Label>
+        <Textarea id={`field_${field.key}`} name={`field_${field.key}`} placeholder={field.placeholder} rows={3} className="text-sm" defaultValue={field.defaultValue} />
       </div>
     );
   }
   if (field.type === "select") {
     return (
       <div className="space-y-1.5">
-        <Label htmlFor={`sheet_${field.key}`} className="text-xs">{field.label}</Label>
-        <select id={`sheet_${field.key}`} name={`sheet_${field.key}`} className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm" defaultValue={field.defaultValue}>
+        <Label htmlFor={`field_${field.key}`} className="text-xs">{field.label}</Label>
+        <select id={`field_${field.key}`} name={`field_${field.key}`} className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm" defaultValue={field.defaultValue}>
           {field.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
@@ -61,8 +61,8 @@ function RenderField({ field }: { field: SheetField }) {
   }
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={`sheet_${field.key}`} className="text-xs">{field.label}</Label>
-      <Input id={`sheet_${field.key}`} name={`sheet_${field.key}`} type={field.type} placeholder={field.placeholder} defaultValue={field.defaultValue} className="h-8 text-sm" />
+      <Label htmlFor={`field_${field.key}`} className="text-xs">{field.label}</Label>
+      <Input id={`field_${field.key}`} name={`field_${field.key}`} type={field.type} placeholder={field.placeholder} defaultValue={field.defaultValue} className="h-8 text-sm" />
     </div>
   );
 }

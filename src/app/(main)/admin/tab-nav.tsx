@@ -11,6 +11,11 @@ const TABS = [
   { key: "overview", label: "概览" },
   { key: "users", label: "用户管理" },
   { key: "campaigns", label: "战役管理" },
+  { key: "dice", label: "掷骰记录" },
+  { key: "characters", label: "角色管理" },
+  { key: "posts", label: "战报管理" },
+  { key: "bindings", label: "绑定管理" },
+  { key: "audit", label: "操作日志" },
 ];
 
 export function AdminTabNav({ current }: { current: string }) {

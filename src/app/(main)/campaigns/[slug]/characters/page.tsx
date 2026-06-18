@@ -13,9 +13,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ status?: string }>;
 }
 
 const SYSTEM_LABELS: Record<string, string> = {
@@ -24,8 +26,21 @@ const SYSTEM_LABELS: Record<string, string> = {
   CUSTOM: "自定义",
 };
 
-export default async function CharactersPage({ params }: PageProps) {
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "草稿",
+  COMPLETE: "完成",
+  APPROVED: "已批准",
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  DRAFT: "border-amber-300 bg-amber-50 text-amber-700",
+  COMPLETE: "border-emerald-300 bg-emerald-50 text-emerald-700",
+  APPROVED: "border-blue-300 bg-blue-50 text-blue-700",
+};
+
+export default async function CharactersPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const { status: statusFilter } = await searchParams;
   const session = await auth();
 
   const campaign = await prisma.campaign.findUnique({
@@ -34,8 +49,13 @@ export default async function CharactersPage({ params }: PageProps) {
   });
   if (!campaign) notFound();
 
+  const where: any = { campaignId: campaign.id };
+  if (statusFilter && ["DRAFT", "COMPLETE", "APPROVED"].includes(statusFilter)) {
+    where.status = statusFilter;
+  }
+
   const characters = await prisma.character.findMany({
-    where: { campaignId: campaign.id },
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       player: { select: { name: true, image: true } },
@@ -64,6 +84,33 @@ export default async function CharactersPage({ params }: PageProps) {
           <Plus className="mr-2 h-4 w-4" />
           创建角色
         </Link>
+      </div>
+
+      {/* 状态筛选 */}
+      <div className="flex gap-2">
+        <Link
+          href={`/campaigns/${slug}/characters`}
+          className={cn(
+            "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+            !statusFilter ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+          )}
+        >
+          全部
+        </Link>
+        {Object.entries(STATUS_LABELS).map(([val, label]) => (
+          <Link
+            key={val}
+            href={`/campaigns/${slug}/characters?status=${val}`}
+            className={cn(
+              "px-3 py-1 rounded-md text-xs font-medium transition-colors border",
+              statusFilter === val
+                ? STATUS_STYLES[val]
+                : "bg-muted hover:bg-muted/80 border-transparent"
+            )}
+          >
+            {label}
+          </Link>
+        ))}
       </div>
 
       {characters.length === 0 ? (
@@ -107,9 +154,12 @@ export default async function CharactersPage({ params }: PageProps) {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Badge variant="secondary">
                       {SYSTEM_LABELS[char.system] || char.system}
+                    </Badge>
+                    <Badge className={STATUS_STYLES[char.status] || STATUS_STYLES.DRAFT}>
+                      {STATUS_LABELS[char.status] || char.status}
                     </Badge>
                     {!char.isPublic && (
                       <Badge variant="outline">隐藏</Badge>

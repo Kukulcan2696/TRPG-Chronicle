@@ -1,10 +1,10 @@
 /**
  * 角色编辑页（弹窗模式）
- * 
+ *
  * 功能：
- * - 编辑角色名、背景、公开/隐藏状态
- * - 更换头像（ImageUpload 组件）
- * - 编辑角色卡的自定义字段（sheetData）
+ * - 编辑角色名、背景、公开/隐藏、状态、QQ绑定
+ * - 更换头像
+ * - 灵活字段系统：增删改角色卡自定义字段
  */
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
@@ -16,25 +16,29 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PortraitUpload } from "@/components/media/portrait-upload";
 
 interface PageProps { params: Promise<{ slug: string; charId: string }> }
+
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "草稿",
+  COMPLETE: "完成",
+  APPROVED: "已批准",
+};
 
 export default async function EditCharacterPage({ params }: PageProps) {
   const { slug, charId } = await params;
   const session = await auth();
 
-  // 获取角色信息，仅角色创建者可编辑
   const character = await prisma.character.findUnique({
     where: { id: charId },
     include: { campaign: { select: { title: true } } },
   });
   if (!character || character.playerId !== session?.user?.id) notFound();
 
-  // 解析角色卡 JSON 数据
-  const sheetData = JSON.parse(character.sheetData || "{}");
+  const sheetData: Record<string, any> = JSON.parse(character.sheetData || "{}");
 
-  // 查询角色绑定的 QQ
   const charBinding = await prisma.botBinding.findFirst({
     where: { characterId: charId },
     select: { platformId: true },
@@ -66,6 +70,16 @@ export default async function EditCharacterPage({ params }: PageProps) {
               <Textarea id="bio" name="bio" defaultValue={character.bio || ""} rows={4} />
             </div>
 
+            {/* 状态选择 */}
+            <div className="space-y-2">
+              <Label htmlFor="status">角色卡状态</Label>
+              <select id="status" name="status" className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm" defaultValue={character.status}>
+                {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="qqNumber">绑定 QQ</Label>
               <Input
@@ -87,12 +101,39 @@ export default async function EditCharacterPage({ params }: PageProps) {
 
             {/* ===== 角色卡自定义字段 ===== */}
             <div className="border-t pt-4">
-              <h3 className="font-semibold text-sm mb-3">角色数据</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm">角色数据</h3>
+                <span className="text-xs text-muted-foreground">
+                  删除字段：留空即可（或点击 ✕）
+                </span>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {Object.entries(sheetData).map(([key, value]) => (
                   <div key={key} className="space-y-1.5">
-                    <Label htmlFor={`sheet_${key}`} className="text-xs">{key}</Label>
-                    <Input id={`sheet_${key}`} name={`sheet_${key}`} defaultValue={String(value)} className="h-8 text-sm" />
+                    <Label htmlFor={`field_${key}`} className="text-xs truncate block">
+                      {key}
+                    </Label>
+                    <Input
+                      id={`field_${key}`}
+                      name={`field_${key}`}
+                      defaultValue={String(value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                ))}
+                {/* 新增字段插槽 */}
+                {[0, 1, 2].map((i) => (
+                  <div key={`new_${i}`} className="space-y-1.5">
+                    <Input
+                      name={`field_new_key_${i}`}
+                      placeholder="字段名"
+                      className="h-7 text-xs"
+                    />
+                    <Input
+                      name={`field_new_val_${i}`}
+                      placeholder="值"
+                      className="h-8 text-sm"
+                    />
                   </div>
                 ))}
               </div>

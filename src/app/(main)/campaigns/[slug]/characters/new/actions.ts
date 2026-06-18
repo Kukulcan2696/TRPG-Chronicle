@@ -36,12 +36,16 @@ export async function createCharacter(campaignSlug: string, formData: FormData) 
   });
   if (!campaign) throw new Error("战役不存在");
 
-  // 收集所有 sheet_ 前缀的字段到 JSON
+  // 收集所有自定义字段到 JSON（去掉 field_ 前缀）
   const sheetData: Record<string, any> = {};
+  const topKeys = ["name", "system", "bio", "isPublic", "portrait", "status"];
   for (const [key, value] of formData.entries()) {
-    // 排除已处理的顶层字段
-    if (!["name", "system", "bio", "isPublic", "portrait"].includes(key)) {
-      sheetData[key] = value;
+    if (!topKeys.includes(key)) {
+      // 去掉 field_ 前缀，兼容旧数据的 sheet_ 前缀
+      const cleanKey = key.startsWith("field_") ? key.slice(6)
+        : key.startsWith("sheet_") ? key.slice(6)
+        : key;
+      sheetData[cleanKey] = value;
     }
   }
 

@@ -2,7 +2,7 @@
  * POST /api/bot/dice/roll — 掷骰并持久化
  *
  * 鉴权: Bearer API Key
- * Body: { formula, campaignId, userId, scene? }
+ * Body: { formula, campaignId, userId?, scene?, characterId?, reason?, difficultyClass?, rollType? }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    const { formula, campaignId, userId, scene } = await req.json();
+    const { formula, campaignId, userId, scene, characterId, reason, difficultyClass, rollType } = await req.json();
 
     if (!formula || !campaignId) {
       return NextResponse.json(
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     // 校验 userId（若提供）：查 BotBinding 或验证 User 是否存在
     // 未绑定 QQ 用户也能掷骰，记录不关联平台用户
     let resolvedUserId: string | null = null;
+    let resolvedCharacterId: string | null = characterId || null;
     if (userId) {
       // 先检查是否为合法平台用户 ID
       const user = await prisma.user.findUnique({
@@ -36,12 +37,18 @@ export async function POST(req: NextRequest) {
       if (user) {
         resolvedUserId = userId;
       } else {
-        // userId 可能是 QQ 号，尝试通过 BotBinding 查找
+        // userId 可能是 QQ 号，尝试通过 BotBinding 查找用户 + 角色
         const binding = await prisma.botBinding.findUnique({
           where: { platform_platformId: { platform: "qq", platformId: userId } },
-          select: { userId: true },
+          select: { userId: true, characterId: true },
         });
-        resolvedUserId = binding?.userId ?? null;
+        if (binding) {
+          resolvedUserId = binding.userId;
+          // 如果调用方没有显式指定 characterId，使用绑定中的
+          if (!resolvedCharacterId && binding.characterId) {
+            resolvedCharacterId = binding.characterId;
+          }
+        }
       }
     }
 
@@ -60,6 +67,21 @@ export async function POST(req: NextRequest) {
 
     const { result, details } = rollDice(formula);
 
+    // 计算检定结果（若提供了 DC）
+    let outcome: string | null = null;
+    const dc = difficultyClass ? parseInt(String(difficultyClass), 10) : null;
+    if (dc !== null && !isNaN(dc)) {
+      if (result === 1) {
+        outcome = "CRITICAL_FAILURE";
+      } else if (formula.startsWith("d20") && result === 20) {
+        outcome = "CRITICAL_SUCCESS";
+      } else if (result >= dc) {
+        outcome = "SUCCESS";
+      } else {
+        outcome = "FAILURE";
+      }
+    }
+
     const diceRoll = await prisma.diceRoll.create({
       data: {
         formula,
@@ -68,6 +90,11 @@ export async function POST(req: NextRequest) {
         scene: scene || null,
         campaignId,
         userId: resolvedUserId,
+        characterId: resolvedCharacterId,
+        reason: reason || null,
+        difficultyClass: dc,
+        outcome,
+        rollType: rollType || "GENERAL",
       },
     });
 

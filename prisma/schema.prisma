@@ -29,6 +29,7 @@ model User {
   media            Media[]
   sessions         Session[]
   botBindings      BotBinding[]
+  auditLogs        AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -142,10 +143,12 @@ model Character {
   portrait   String?
   bio        String?
   isPublic   Boolean @default(true)
+  status     String  @default("DRAFT")  // DRAFT / COMPLETE / APPROVED
 
   campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   player      User         @relation(fields: [playerId], references: [id])
   botBindings BotBinding[]
+  diceRolls   DiceRoll[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -237,18 +240,24 @@ model ScheduleRSVP {
 }
 
 model DiceRoll {
-  id         String   @id @default(cuid())
-  formula    String
-  result     Int
-  details    String?
-  scene      String?
-  userId     String?
-  campaignId String
-  postId     String?
+  id              String   @id @default(cuid())
+  formula         String
+  result          Int
+  details         String?
+  scene           String?
+  userId          String?
+  characterId     String?
+  campaignId      String
+  postId          String?
+  reason          String?
+  difficultyClass Int?
+  outcome         String?   // SUCCESS / FAILURE / CRITICAL_SUCCESS / CRITICAL_FAILURE
+  rollType        String    @default("GENERAL")  // CHECK / DAMAGE / ATTRIBUTE / GENERAL
 
-  user     User?    @relation(fields: [userId], references: [id])
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  post     Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  user      User?      @relation(fields: [userId], references: [id])
+  character Character?  @relation(fields: [characterId], references: [id])
+  campaign  Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  post      Post?       @relation(fields: [postId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 }
@@ -317,4 +326,16 @@ model GroupBinding {
   updatedAt DateTime @updatedAt
 
   @@unique([platform, groupId])
+}
+
+// ── 管理员操作日志 ──
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String    // 如 "DELETE_CAMPAIGN", "CHANGE_ROLE", "DELETE_DICE_ROLL"
+  target    String    // 受影响的实体描述
+  details   String?   // JSON 详情
+  createdAt DateTime  @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
 }
