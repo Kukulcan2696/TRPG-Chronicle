@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeletePostButton } from "./post-delete-button";
+import { TogglePublishButton } from "./post-toggle-button";
 
 const PAGE_SIZE = 15;
 
@@ -50,25 +51,32 @@ export async function PostsTab({ page, query }: { page: number; query: string })
               <th className="py-2 pr-4 font-medium hidden sm:table-cell">状态</th>
               <th className="py-2 pr-4 font-medium hidden md:table-cell">作者</th>
               <th className="py-2 pr-4 font-medium hidden lg:table-cell">战役</th>
-              <th className="py-2 pr-4 font-medium hidden sm:table-cell">发表时间</th>
-              <th className="py-2 w-12"></th>
+              <th className="py-2 pr-4 font-medium hidden sm:table-cell">时间</th>
+              <th className="py-2 font-medium w-28">操作</th>
             </tr>
           </thead>
           <tbody>
             {posts.map((p) => (
               <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50">
-                <td className="py-2 pr-4 font-medium truncate max-w-xs">{p.title}</td>
+                <td className="py-2 pr-4">
+                  <a href={`/campaigns/${p.campaign.slug}/posts/${p.slug}`}
+                     className="font-medium text-primary hover:underline truncate max-w-xs block" target="_blank">
+                    {p.title}
+                  </a>
+                </td>
                 <td className="py-2 pr-4 hidden sm:table-cell">
-                  <Badge variant={p.published ? "default" : "secondary"} className="text-xs">
-                    {p.published ? "已发布" : "草稿"}
-                  </Badge>
+                  <TogglePublishButton postId={p.id} published={p.published} />
                 </td>
                 <td className="py-2 pr-4 hidden md:table-cell text-xs">{p.author?.name ?? "—"}</td>
-                <td className="py-2 pr-4 hidden lg:table-cell text-xs">{p.campaign.title}</td>
+                <td className="py-2 pr-4 hidden lg:table-cell text-xs">
+                  <a href={`/campaigns/${p.campaign.slug}`} className="hover:underline" target="_blank">
+                    {p.campaign.title}
+                  </a>
+                </td>
                 <td className="py-2 pr-4 hidden sm:table-cell text-xs text-muted-foreground whitespace-nowrap">
                   {new Date(p.createdAt).toLocaleDateString("zh-CN")}
                 </td>
-                <td className="py-2">
+                <td className="py-2 flex gap-1">
                   <DeletePostButton postId={p.id} postTitle={p.title} />
                 </td>
               </tr>

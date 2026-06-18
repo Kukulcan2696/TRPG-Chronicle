@@ -5,18 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteCharButton } from "./char-delete-button";
+import { CharStatusSelect } from "./char-status-select";
 
 const PAGE_SIZE = 15;
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "草稿", COMPLETE: "完成", APPROVED: "已批准",
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-amber-100 text-amber-800",
-  COMPLETE: "bg-emerald-100 text-emerald-800",
-  APPROVED: "bg-blue-100 text-blue-800",
-};
 
 export async function CharactersTab({ page, query }: { page: number; query: string }) {
   const where: any = {};
@@ -35,7 +26,7 @@ export async function CharactersTab({ page, query }: { page: number; query: stri
       skip: (page - 1) * PAGE_SIZE,
       include: {
         campaign: { select: { title: true, slug: true } },
-        player: { select: { name: true } },
+        player: { select: { id: true, name: true } },
       },
     }),
     prisma.character.count({ where }),
@@ -62,23 +53,30 @@ export async function CharactersTab({ page, query }: { page: number; query: stri
               <th className="py-2 pr-4 font-medium hidden md:table-cell">玩家</th>
               <th className="py-2 pr-4 font-medium hidden lg:table-cell">战役</th>
               <th className="py-2 pr-4 font-medium hidden sm:table-cell">更新</th>
-              <th className="py-2 w-12"></th>
+              <th className="py-2 font-medium w-28">操作</th>
             </tr>
           </thead>
           <tbody>
             {characters.map((c) => (
               <tr key={c.id} className="border-b last:border-0 hover:bg-muted/50">
-                <td className="py-2 pr-4 font-medium">{c.name}</td>
+                <td className="py-2 pr-4">
+                  <a href={`/campaigns/${c.campaign.slug}/characters/${c.id}`}
+                     className="font-medium text-primary hover:underline" target="_blank">
+                    {c.name}
+                  </a>
+                </td>
                 <td className="py-2 pr-4 hidden sm:table-cell">
                   <Badge variant="secondary" className="text-xs">{c.system}</Badge>
                 </td>
                 <td className="py-2 pr-4 hidden md:table-cell">
-                  <Badge className={STATUS_STYLES[c.status] || ""}>
-                    {STATUS_LABELS[c.status] || c.status}
-                  </Badge>
+                  <CharStatusSelect charId={c.id} currentStatus={c.status} />
                 </td>
                 <td className="py-2 pr-4 hidden md:table-cell text-xs">{c.player.name}</td>
-                <td className="py-2 pr-4 hidden lg:table-cell text-xs">{c.campaign.title}</td>
+                <td className="py-2 pr-4 hidden lg:table-cell text-xs">
+                  <a href={`/campaigns/${c.campaign.slug}`} className="hover:underline" target="_blank">
+                    {c.campaign.title}
+                  </a>
+                </td>
                 <td className="py-2 pr-4 hidden sm:table-cell text-xs text-muted-foreground whitespace-nowrap">
                   {new Date(c.updatedAt).toLocaleDateString("zh-CN")}
                 </td>

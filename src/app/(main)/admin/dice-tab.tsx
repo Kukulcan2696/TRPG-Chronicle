@@ -100,13 +100,19 @@ export async function DiceTab({ page, query }: { page: number; query: string }) 
                   )}
                 </td>
                 <td className="py-2 pr-4 hidden sm:table-cell text-xs">
-                  {r.character?.name || "—"}
+                  {r.character ? (
+                    <a href={`/campaigns/${r.campaignId}/characters/${r.characterId}`} className="text-primary hover:underline" target="_blank">
+                      {r.character.name}
+                    </a>
+                  ) : "—"}
                 </td>
                 <td className="py-2 pr-4 hidden lg:table-cell text-xs">
                   {r.user?.name || "—"}
                 </td>
                 <td className="py-2 pr-4 hidden lg:table-cell text-xs">
-                  {r.campaign.title}
+                  <a href={`/campaigns/${r.campaignId}`} className="hover:underline" target="_blank">
+                    {r.campaign.title}
+                  </a>
                 </td>
                 <td className="py-2 pr-4 hidden xl:table-cell text-xs text-muted-foreground truncate max-w-32">
                   {r.reason || r.scene || "—"}

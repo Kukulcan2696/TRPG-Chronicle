@@ -111,3 +111,78 @@ export async function deleteBinding(id: string, type: "bot" | "group") {
   }
   revalidatePath("/admin");
 }
+
+/**
+ * 编辑战役（标题、描述）
+ */
+export async function updateCampaign(campaignId: string, formData: FormData) {
+  const session = await auth();
+  requireAdmin(session);
+
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
+  if (!title) throw new Error("标题不能为空");
+
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { title, description },
+  });
+  await logAction("UPDATE_CAMPAIGN", title);
+  revalidatePath("/admin");
+}
+
+/**
+ * 删除用户（管理员）
+ */
+export async function deleteUser(userId: string) {
+  const session = await auth();
+  const admin = requireAdmin(session);
+  if (userId === admin.id) throw new Error("不能删除自己");
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
+  if (!user) throw new Error("用户不存在");
+
+  await prisma.user.delete({ where: { id: userId } });
+  await logAction("DELETE_USER", `${user.name || user.email}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * 切换战报发布状态
+ */
+export async function togglePostPublish(postId: string) {
+  const session = await auth();
+  requireAdmin(session);
+
+  const post = await prisma.post.findUnique({ where: { id: postId }, select: { title: true, published: true } });
+  if (!post) throw new Error("战报不存在");
+
+  await prisma.post.update({
+    where: { id: postId },
+    data: { published: !post.published },
+  });
+  await logAction("TOGGLE_POST", `${post.title} → ${!post.published ? "已发布" : "草稿"}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * 修改角色状态
+ */
+export async function updateCharacterStatus(charId: string, status: string) {
+  const session = await auth();
+  requireAdmin(session);
+
+  if (!["DRAFT", "COMPLETE", "APPROVED"].includes(status)) {
+    throw new Error("无效的状态");
+  }
+
+  const char = await prisma.character.findUnique({ where: { id: charId }, select: { name: true } });
+  if (!char) throw new Error("角色不存在");
+
+  await prisma.character.update({
+    where: { id: charId },
+    data: { status },
+  });
+  await logAction("UPDATE_CHARACTER_STATUS", `${char.name} → ${status}`);
+  revalidatePath("/admin");
+}

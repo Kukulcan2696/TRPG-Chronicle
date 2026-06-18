@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AdminUserActions } from "./user-actions";
 import { AdminDeleteCampaign } from "./campaign-actions";
+import { CampaignEditButton } from "./campaign-edit-button";
 import { AdminTabNav } from "./tab-nav";
 import { DiceTab } from "./dice-tab";
 import { CharactersTab } from "./characters-tab";
@@ -30,7 +31,7 @@ const PAGE_SIZE = 15;
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; page?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string; q?: string; action?: string }>;
 }) {
   const session = await auth();
   if (!session?.user || (session.user as any).role !== "ADMIN") {
@@ -84,10 +85,16 @@ export default async function AdminPage({
       {tab === "posts" && <PostsTab page={page} query={query} />}
 
       {/* ===== 绑定管理标签页 ===== */}
-      {tab === "bindings" && <BindingsTab />}
+      {tab === "bindings" && <BindingsTab page={page} query={query} />}
 
       {/* ===== 操作日志标签页 ===== */}
-      {tab === "audit" && <AuditLogTab page={page} />}
+      {tab === "audit" && (
+        <AuditLogTab
+          page={page}
+          action={sp.action}
+          q={query}
+        />
+      )}
     </div>
   );
 }
@@ -325,7 +332,9 @@ async function UsersTab({ page, query }: { page: number; query: string }) {
               ) : (
                 users.map((u) => (
                   <tr key={u.id} className="border-b hover:bg-muted/30">
-                    <td className="px-4 py-2 font-medium text-xs">{u.name || "未命名"}</td>
+                    <td className="px-4 py-2 font-medium text-xs">
+                      <Link href={`/profile`} className="text-primary hover:underline">{u.name || "未命名"}</Link>
+                    </td>
                     <td className="px-4 py-2 text-muted-foreground text-xs">{u.email}</td>
                     <td className="px-4 py-2">
                       <Badge variant={u.role === "ADMIN" ? "default" : "outline"} className="text-[10px]">
@@ -398,7 +407,8 @@ async function CampaignsTab({ page, query }: { page: number; query: string }) {
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: {
+      select: {
+        id: true, title: true, slug: true, description: true, createdAt: true,
         dm: { select: { id: true, name: true } },
         _count: { select: { members: true, posts: true, characters: true, diceRolls: true } },
       },
@@ -474,7 +484,10 @@ async function CampaignsTab({ page, query }: { page: number; query: string }) {
                     <td className="px-4 py-2 text-xs text-muted-foreground text-right hidden md:table-cell">{c._count.posts}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground text-right hidden lg:table-cell">{c._count.diceRolls}</td>
                     <td className="px-4 py-2 text-right">
-                      <AdminDeleteCampaign campaignId={c.id} campaignTitle={c.title} />
+                      <div className="flex items-center gap-1 justify-end">
+                        <CampaignEditButton campaignId={c.id} currentTitle={c.title} currentDescription={c.description} />
+                        <AdminDeleteCampaign campaignId={c.id} campaignTitle={c.title} />
+                      </div>
                     </td>
                   </tr>
                 ))
