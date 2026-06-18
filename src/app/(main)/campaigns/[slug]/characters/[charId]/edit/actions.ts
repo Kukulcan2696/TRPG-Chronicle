@@ -70,58 +70,58 @@ export async function updateCharacter(campaignSlug: string, charId: string, form
     existingData[k] = v;
   }
 
-  await prisma.character.update({
-    where: { id: charId },
-    data: {
-      name,
-      bio,
-      isPublic,
-      status,
-      portrait,
-      sheetData: JSON.stringify(existingData),
-    },
-  });
-
-  // 处理 QQ 绑定
-  if (qqNumber && /^\d{5,15}$/.test(qqNumber)) {
-    // 检查冲突：该 QQ 是否已被其他用户或其他角色绑定
-    const existingBinding = await prisma.botBinding.findUnique({
-      where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
-      select: { userId: true, characterId: true, character: { select: { name: true } } },
-    });
-    if (existingBinding) {
-      if (existingBinding.userId !== session.user.id) {
-        throw new Error("该 QQ 号已被其他用户绑定");
-      }
-      if (existingBinding.characterId && existingBinding.characterId !== charId) {
-        throw new Error(
-          `该 QQ 号已绑定到角色「${existingBinding.character?.name || "未知"}」，请先解绑该角色`
-        );
-      }
-    }
-    // 绑定/更新：upsert BotBinding
-    await prisma.botBinding.upsert({
-      where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
-      update: { userId: session.user.id, characterId: charId },
-      create: {
-        platform: "qq",
-        platformId: qqNumber,
-        userId: session.user.id,
-        characterId: charId,
+  // 使用事务确保角色更新和 QQ 绑定操作原子性
+  await prisma.$transaction(async (tx) => {
+    await tx.character.update({
+      where: { id: charId },
+      data: {
+        name,
+        bio,
+        isPublic,
+        status,
+        portrait,
+        sheetData: JSON.stringify(existingData),
       },
     });
-  } else if (qqNumber === "") {
-    // 清空角色绑定：仅清除 characterId，保留用户绑定
-    const existingBinding = await prisma.botBinding.findFirst({
-      where: { characterId: charId },
-    });
-    if (existingBinding) {
-      await prisma.botBinding.update({
-        where: { id: existingBinding.id },
-        data: { characterId: null, campaignId: null },
+
+    // 处理 QQ 绑定
+    if (qqNumber && /^\d{5,15}$/.test(qqNumber)) {
+      const existingBinding = await tx.botBinding.findUnique({
+        where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+        select: { userId: true, characterId: true, character: { select: { name: true } } },
       });
+      if (existingBinding) {
+        if (existingBinding.userId !== session.user.id) {
+          throw new Error("该 QQ 号已被其他用户绑定");
+        }
+        if (existingBinding.characterId && existingBinding.characterId !== charId) {
+          throw new Error(
+            `该 QQ 号已绑定到角色「${existingBinding.character?.name || "未知"}」，请先解绑该角色`
+          );
+        }
+      }
+      await tx.botBinding.upsert({
+        where: { platform_platformId: { platform: "qq", platformId: qqNumber } },
+        update: { userId: session.user.id, characterId: charId },
+        create: {
+          platform: "qq",
+          platformId: qqNumber,
+          userId: session.user.id,
+          characterId: charId,
+        },
+      });
+    } else if (qqNumber === "") {
+      const existingBinding = await tx.botBinding.findFirst({
+        where: { characterId: charId },
+      });
+      if (existingBinding) {
+        await tx.botBinding.update({
+          where: { id: existingBinding.id },
+          data: { characterId: null, campaignId: null },
+        });
+      }
     }
-  }
+  });
   // qqNumber === null 表示表单中没有该字段（不应该发生，但安全处理）
 
   revalidatePath(`/campaigns/${campaignSlug}/characters`);

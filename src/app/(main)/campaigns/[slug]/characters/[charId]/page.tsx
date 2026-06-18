@@ -18,7 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { CHARACTER_TEMPLATES, type SheetField } from "@/lib/character-templates";
 import { DeleteCharButton } from "@/components/character/delete-button";
-import { Pencil, ArrowLeft } from "lucide-react";
+import { Pencil, ArrowLeft, CheckCircle } from "lucide-react";
+import { ApproveButton } from "@/components/character/approve-button";
 
 interface PageProps { params: Promise<{ slug: string; charId: string }> }
 
@@ -81,7 +82,7 @@ export default async function CharacterPage({ params }: PageProps) {
   const character = await prisma.character.findUnique({
     where: { id: charId },
     include: {
-      campaign: { select: { title: true, slug: true } },
+      campaign: { select: { title: true, slug: true, dmId: true } },
       player: { select: { id: true, name: true, image: true } },
     },
   });
@@ -93,9 +94,13 @@ export default async function CharacterPage({ params }: PageProps) {
   if (!character || character.campaign.slug !== slug) notFound();
 
   const template = CHARACTER_TEMPLATES.find((t) => t.id === character.system);
-  const sheetData: Record<string, any> = JSON.parse(character.sheetData || "{}");
+  // 安全解析 sheetData（防止损坏的 JSON 导致页面崩溃）
+  let sheetData: Record<string, any> = {};
+  try {
+    sheetData = JSON.parse(character.sheetData || "{}");
+  } catch { /* 解析失败回退为空对象 */ }
   const isOwner = session?.user?.id === character.playerId;
-  const isDM = session?.user?.id === character.campaign.slug; // Will be checked in page
+  const isDM = session?.user?.id === character.campaign.dmId;
 
   // 分离 section 字段和普通字段
   const allFields = template?.fields ?? [];
@@ -130,6 +135,9 @@ export default async function CharacterPage({ params }: PageProps) {
             </Link>
             <DeleteCharButton campaignSlug={slug} charId={charId} />
           </div>
+        )}
+        {isDM && !isOwner && character.status !== "APPROVED" && (
+          <ApproveButton charId={charId} charName={character.name} />
         )}
       </div>
 

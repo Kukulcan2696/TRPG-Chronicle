@@ -246,6 +246,203 @@ class TrpgPlugin(Star):
             logger.error(f"[TRPG] 我的角色查询失败: {e}")
             yield event.plain_result(f"❌ 查询失败: {e}")
 
+    @filter.command("createchar")
+    async def cmd_createchar(self, event: AstrMessageEvent, message: str = ""):
+        """创建角色并自动绑定 QQ。
+用法: !createchar <名称> [系统] [key=value ...]
+示例: !createchar 艾琳 DND5E STR=15 DEX=12"""
+        group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        if not message:
+            yield event.plain_result(
+                "用法: !createchar <名称> [系统] [key=value ...]\n"
+                "示例: !createchar 艾琳 CUSTOM\n"
+                "      !createchar 甘道夫 DND5E STR=15 DEX=12 race=人类"
+            )
+            return
+
+        parts = message.strip().split()
+        name = parts[0]
+        system = "CUSTOM"
+        sheet_data: dict = {}
+        idx = 1
+
+        # 第二个参数可能是系统名
+        known_systems = ["DND5E", "COC7", "CUSTOM"]
+        if len(parts) > 1 and parts[1].upper() in known_systems:
+            system = parts[1].upper()
+            idx = 2
+
+        # 后续参数为 key=value
+        for part in parts[idx:]:
+            if "=" in part:
+                k, v = part.split("=", 1)
+                sheet_data[k.strip()] = v.strip()
+
+        try:
+            result = await self.api.create_character(
+                name=name,
+                campaign_id=campaign_id,
+                player_id=sender_id,  # QQ 号 → 服务端解析
+                system=system,
+                sheet_data=sheet_data if sheet_data else None,
+                platform_id=sender_id,  # 自动绑定 QQ
+            )
+            reply = f"✅ 角色「{result['name']}」已创建 [{system}]"
+            if sheet_data:
+                reply += f"\n📝 属性: {', '.join(f'{k}={v}' for k, v in sheet_data.items())}"
+            yield event.plain_result(reply)
+        except Exception as e:
+            logger.error(f"[TRPG] 创建角色失败: {e}")
+            # 用户未绑定的情况给提示
+            err_str = str(e)
+            if "未绑定" in err_str or "不存在" in err_str:
+                yield event.plain_result(
+                    f"❌ 创建失败：请先用 !bindqq <邮箱> 绑定平台账号。\n"
+                    f"然后在 Web 平台登录后可创建角色。"
+                )
+            else:
+                yield event.plain_result(f"❌ 创建失败: {e}")
+
+    @filter.command("bindchar")
+    async def cmd_bindchar(self, event: AstrMessageEvent, name: str = ""):
+        """将当前 QQ 绑定到指定角色。用法: !bindchar <角色名>"""
+        group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        if not name:
+            yield event.plain_result("用法: !bindchar <角色名>")
+
+        try:
+            # 先根据名字查找角色
+            result = await self.api.get_characters(campaign_id, name=name)
+            chars = result.get("characters", [])
+            if not chars:
+                yield event.plain_result(f"❌ 未找到角色: {name}")
+                return
+
+            matched = chars[0]  # 取第一个匹配的
+            bind_result = await self.api.bind_character(matched["id"], sender_id)
+            yield event.plain_result(
+                f"✅ QQ {sender_id} 已绑定到角色「{matched['name']}」"
+            )
+        except Exception as e:
+            logger.error(f"[TRPG] 绑定角色失败: {e}")
+            yield event.plain_result(f"❌ 绑定失败: {e}")
+
+    @filter.command("editchar")
+    async def cmd_editchar(self, event: AstrMessageEvent, message: str = ""):
+        """编辑自己的角色。用法: !editchar key=value [key=value ...]
+示例: !editchar bio=新简介 STR=16"""
+        group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        if not message:
+            yield event.plain_result(
+                "用法: !editchar <字段>=<值> ...\n"
+                "示例: !editchar bio=新简介\n"
+                "      !editchar STR=16 DEX=14 status=COMPLETE"
+            )
+            return
+
+        # 查找绑定的角色
+        char_result = await self.api.get_characters(campaign_id, platform_id=sender_id)
+        chars = char_result.get("characters", [])
+        bound_id = char_result.get("boundCharacterId")
+        if not bound_id or not chars:
+            yield event.plain_result("❌ 你没有绑定的角色。请先用 !bindchar <角色名> 绑定。")
+            return
+
+        my_char = next((c for c in chars if c["id"] == bound_id), None)
+        if not my_char:
+            yield event.plain_result("❌ 未找到你的角色。")
+
+        # 解析 key=value 对
+        sheet_data: dict = {}
+        bio = None
+        status = None
+        for part in message.strip().split():
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k, v = k.strip(), v.strip()
+                if k in ("bio", "status"):
+                    if k == "bio":
+                        bio = v
+                    elif k == "status":
+                        status = v.upper()
+                else:
+                    sheet_data[k] = v
+
+        try:
+            await self.api.update_character(
+                bound_id,
+                bio=bio,
+                status=status,
+                sheet_data=sheet_data if sheet_data else None,
+            )
+            reply = f"✅ 角色「{my_char['name']}」已更新"
+            if sheet_data:
+                reply += f"\n📝 {', '.join(f'{k}={v}' for k, v in sheet_data.items())}"
+            if bio:
+                reply += f"\n📝 简介已更新"
+            if status:
+                status_labels = {"DRAFT": "📝草稿", "COMPLETE": "✅完成", "APPROVED": "🌟已批准"}
+                reply += f"\n📊 状态: {status_labels.get(status, status)}"
+            yield event.plain_result(reply)
+        except Exception as e:
+            logger.error(f"[TRPG] 编辑角色失败: {e}")
+            yield event.plain_result(f"❌ 编辑失败: {e}")
+
+    @filter.command("deletechar")
+    async def cmd_deletechar(self, event: AstrMessageEvent, confirm: str = ""):
+        """删除自己绑定的角色。用法: !deletechar confirm"""
+        group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
+        campaign_id = await self.binding.get_campaign_for_group(group_id)
+        if not campaign_id:
+            yield event.plain_result("⚠ 当前群未绑定战役。")
+            return
+
+        # 查找绑定的角色
+        char_result = await self.api.get_characters(campaign_id, platform_id=sender_id)
+        chars = char_result.get("characters", [])
+        bound_id = char_result.get("boundCharacterId")
+        if not bound_id or not chars:
+            yield event.plain_result("❌ 你没有绑定的角色。")
+            return
+
+        my_char = next((c for c in chars if c["id"] == bound_id), None)
+        if not my_char:
+            yield event.plain_result("❌ 未找到你的角色。")
+
+        if confirm.lower() != "confirm":
+            yield event.plain_result(
+                f"⚠ 确认删除角色「{my_char['name']}」？\n"
+                f"此操作不可撤销！输入 !deletechar confirm 确认。"
+            )
+            return
+
+        try:
+            await self.api.delete_character(bound_id)
+            self.binding.invalidate_user_cache(sender_id)
+            yield event.plain_result(f"✅ 角色「{my_char['name']}」已删除。")
+        except Exception as e:
+            logger.error(f"[TRPG] 删除角色失败: {e}")
+            yield event.plain_result(f"❌ 删除失败: {e}")
+
     # ================================================================
     #  百科命令
     # ================================================================
@@ -608,6 +805,13 @@ class TrpgPlugin(Star):
   !unbind            解绑QQ群（群管理员）
   !bindqq <邮箱>     绑定QQ号到平台账号
   !rsvp <事件ID> [going/maybe/cant]  回复排期
+
+**角色**
+  !createchar <名> [系统] [key=value..]  创建角色并绑定QQ
+  !bindchar <角色名>                     绑定QQ到已有角色
+  !editchar key=value ...                编辑绑定的角色
+  !deletechar confirm                    删除绑定的角色
+
   !trpghelp          显示此帮助
 
 📖 网站: 查看完整数据请登录平台"""

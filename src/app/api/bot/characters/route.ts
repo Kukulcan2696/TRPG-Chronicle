@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
-    const { name, campaignId, playerId, system, bio } = await req.json();
+    const { name, campaignId, playerId, system, bio, sheetData, platformId: bindPlatformId } = await req.json();
 
     if (!name || !campaignId || !playerId) {
       return NextResponse.json(
@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
 
     // 解析 playerId：可能是平台用户 ID 或 QQ 号
     let resolvedPlayerId: string | null = null;
+    let qqNumber: string | null = null;
     const user = await prisma.user.findUnique({
       where: { id: playerId },
       select: { id: true },
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
         select: { userId: true },
       });
       resolvedPlayerId = binding?.userId ?? null;
+      if (binding) qqNumber = playerId;
     }
 
     if (!resolvedPlayerId) {
@@ -128,6 +130,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 构建 sheetData JSON（支持传入对象直接存储）
+    let sheetDataStr = "{}";
+    if (sheetData) {
+      if (typeof sheetData === "string") {
+        sheetDataStr = sheetData; // 直接当 JSON 字符串用
+      } else if (typeof sheetData === "object") {
+        sheetDataStr = JSON.stringify(sheetData);
+      }
+    }
+
     const character = await prisma.character.create({
       data: {
         name,
@@ -135,8 +147,24 @@ export async function POST(req: NextRequest) {
         playerId: resolvedPlayerId,
         system: system || "CUSTOM",
         bio: bio || null,
+        sheetData: sheetDataStr,
       },
     });
+
+    // 如果提供了 bindPlatformId，自动绑定 QQ 到新角色
+    const bindQQ = bindPlatformId || qqNumber;
+    if (bindQQ) {
+      await prisma.botBinding.upsert({
+        where: { platform_platformId: { platform: "qq", platformId: bindQQ } },
+        update: { userId: resolvedPlayerId, characterId: character.id },
+        create: {
+          platform: "qq",
+          platformId: bindQQ,
+          userId: resolvedPlayerId,
+          characterId: character.id,
+        },
+      });
+    }
 
     return NextResponse.json(character, { status: 201 });
   } catch (error) {

@@ -85,6 +85,59 @@ class TrpgApiClient:
     async def get_character_detail(self, char_id: str) -> Dict[str, Any]:
         return await self._request("GET", f"/characters/{char_id}")
 
+    async def create_character(
+        self,
+        name: str,
+        campaign_id: str,
+        player_id: str,
+        system: str = "CUSTOM",
+        bio: Optional[str] = None,
+        sheet_data: Optional[Dict[str, Any]] = None,
+        platform_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        body: Dict[str, Any] = {
+            "name": name,
+            "campaignId": campaign_id,
+            "playerId": player_id,
+            "system": system,
+        }
+        if bio:
+            body["bio"] = bio
+        if sheet_data:
+            body["sheetData"] = sheet_data
+        if platform_id:
+            body["platformId"] = platform_id
+        return await self._request("POST", "/characters", json=body)
+
+    async def update_character(
+        self,
+        char_id: str,
+        name: Optional[str] = None,
+        bio: Optional[str] = None,
+        status: Optional[str] = None,
+        sheet_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        body: Dict[str, Any] = {}
+        if name is not None:
+            body["name"] = name
+        if bio is not None:
+            body["bio"] = bio
+        if status is not None:
+            body["status"] = status
+        if sheet_data is not None:
+            body["sheetData"] = sheet_data
+        return await self._request("PATCH", f"/characters/{char_id}", json=body)
+
+    async def delete_character(self, char_id: str) -> Dict[str, Any]:
+        return await self._request("DELETE", f"/characters/{char_id}")
+
+    async def bind_character(
+        self, char_id: str, platform_id: str
+    ) -> Dict[str, Any]:
+        return await self._request(
+            "POST", f"/characters/{char_id}/bind", json={"platformId": platform_id}
+        )
+
     # ── 百科 ──
 
     async def get_wiki_entries(
